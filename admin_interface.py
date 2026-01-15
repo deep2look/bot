@@ -164,6 +164,73 @@ async def delete_button_handler_view(callback: CallbackQuery):
     await callback.answer("✅ تم حذف الزر")
     await list_buttons_admin_view(callback)
 
+
+@router.callback_query(F.data.startswith("btn_edit:"))
+async def edit_button_handler(callback: CallbackQuery, state: FSMContext):
+    btn_id = int(callback.data.split(":")[-1])
+    btn = db.get_button_by_id(btn_id)
+    
+    if not btn:
+        await callback.answer("الزر غير موجود")
+        return
+
+    await state.update_data(edit_btn_id=btn_id)
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="✏️ تغيير الاسم", callback_data=f"btn_edit_field:text:{btn_id}")],
+        [InlineKeyboardButton(text="📝 تغيير المحتوى", callback_data=f"btn_edit_field:content:{btn_id}")],
+        [InlineKeyboardButton(text="⬅️ رجوع", callback_data="admin:buttons_list")]
+    ])
+    
+    await callback.message.edit_text(
+        f"📝 تعديل الزر: {btn['text']}\n"
+        f"النوع: {btn['type']}\n"
+        f"المحتوى الحالي: {btn['content']}\n\n"
+        "ماذا تريد أن تعدل؟",
+        reply_markup=keyboard
+    )
+
+@router.callback_query(F.data.startswith("btn_edit_field:"))
+async def edit_button_field_handler(callback: CallbackQuery, state: FSMContext):
+    parts = callback.data.split(":")
+    field = parts[1]
+    btn_id = int(parts[2])
+    
+    await state.update_data(edit_field=field, edit_btn_id=btn_id)
+    
+    if field == "text":
+        await state.set_state(ManageButtons.waiting_for_new_text)
+        await callback.message.edit_text("أرسل الاسم الجديد للزر:", reply_markup=back_to_admin_button())
+    else:
+        await state.set_state(ManageButtons.waiting_for_new_content)
+        btn = db.get_button_by_id(btn_id)
+        msg = "أرسل المحتوى الجديد للزر:"
+        if btn['type'] == 'url':
+            msg = "أرسل الرابط الجديد (http://...):"
+        elif btn['type'] == 'contact':
+            msg = "أرسل معلومات التواصل الجديدة:"
+        
+        await callback.message.edit_text(msg, reply_markup=back_to_admin_button())
+
+@router.message(ManageButtons.waiting_for_new_text)
+async def process_new_text(message: Message, state: FSMContext):
+    data = await state.get_data()
+    btn_id = data.get("edit_btn_id")
+    new_text = message.text.strip()
+    
+    db.update_button(btn_id, text=new_text)
+    await state.clear()
+    await message.answer(f"✅ تم تغيير اسم الزر إلى: {new_text}", reply_markup=admin_main_keyboard_markup())
+
+@router.message(ManageButtons.waiting_for_new_content)
+async def process_new_content(message: Message, state: FSMContext):
+    data = await state.get_data()
+    btn_id = data.get("edit_btn_id")
+    new_content = message.text.strip()
+    
+    db.update_button(btn_id, content=new_content)
+    await state.clear()
+    await message.answer("✅ تم تحديث محتوى الزر بنجاح!", reply_markup=admin_main_keyboard_markup())
+
 # ======================
 # Add Supervisor Handlers
 # ======================
