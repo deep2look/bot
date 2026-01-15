@@ -5,7 +5,7 @@ from aiogram.types import CallbackQuery, InlineKeyboardMarkup, InlineKeyboardBut
 from aiogram.fsm.context import FSMContext
 
 from database import Database
-from states import AddSupervisor, ManageButtons
+from states import AddSupervisor, ManageButtons, SupportState
 
 router = Router()
 db = Database()
