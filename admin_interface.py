@@ -35,6 +35,8 @@ def admin_main_keyboard_markup(user_id):
         buttons.append([InlineKeyboardButton(text="📊 الإحصائيات", callback_data="admin:stats")])
     if is_super or db.has_permission(user_id, 'logs'):
         buttons.append([InlineKeyboardButton(text="📜 سجل المراسلات", callback_data="admin:logs")])
+    if is_super:
+        buttons.append([InlineKeyboardButton(text="🛡️ سجل المشرفين", callback_data="admin:admin_logs")])
     buttons.append([InlineKeyboardButton(text="⬅️ إغلاق", callback_data="admin:close")])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
@@ -237,6 +239,7 @@ async def add_button_finish_handler(message: Message, state: FSMContext):
         parent_id=data.get('parent_id'),
         created_by=message.from_user.id
     )
+    db.add_admin_log(message.from_user.id, message.from_user.full_name, "إضافة زر", "إدارة الأزرار", f"إضافة زر جديد: {data['text']}")
     await state.clear()
     await message.answer("✅ تم إضافة الزر بنجاح!", reply_markup=admin_main_keyboard_markup())
 
@@ -385,7 +388,12 @@ async def edit_manager_perms(callback: CallbackQuery):
     if len(parts) > 3:
         feature_id = parts[3]
         current_perms = db.get_supervisor_permissions(target_id)
-        db.set_supervisor_permission(target_id, feature_id, feature_id not in current_perms)
+        granted = feature_id not in current_perms
+        db.set_supervisor_permission(target_id, feature_id, granted)
+        
+        # Log action
+        action_text = "تفعيل" if granted else "تعطيل"
+        db.add_admin_log(callback.from_user.id, callback.from_user.full_name, f"{action_text} صلاحية {feature_id}", "إدارة المشرفين", f"للمشرف {target_id}")
 
     features = db.get_features()
     user_perms = db.get_supervisor_permissions(target_id)
@@ -411,6 +419,7 @@ async def delete_manager_handler(callback: CallbackQuery):
     
     target_id = int(callback.data.split(":")[-1])
     db.delete_supervisor(target_id)
+    db.add_admin_log(callback.from_user.id, callback.from_user.full_name, "حذف مشرف", "إدارة المشرفين", f"حذف المشرف {target_id} نهائياً")
     await callback.answer("✅ تم حذف المشرف نهائياً")
     await list_managers_view(callback)
 
@@ -469,6 +478,7 @@ async def support_reply_process(message: Message, state: FSMContext, bot: Bot):
     try:
         await bot.send_message(user_id, f"✉️ **رد من الإدارة:**\n\n{message.text}", parse_mode="Markdown")
         db.add_support_message(user_id, message.text, is_from_admin=1, admin_id=message.from_user.id, button_id=button_id, admin_name=admin_name)
+        db.add_admin_log(message.from_user.id, admin_name, "الرد على مستخدم", "سجل المراسلات", f"رد على المستخدم {user_id}")
         await message.answer("✅ تم إرسال الرد بنجاح.")
     except Exception as e:
         await message.answer(f"❌ فشل إرسال الرد: {e}")
@@ -493,27 +503,24 @@ async def show_logs_categories(callback: CallbackQuery):
     
     await callback.message.edit_text("📜 اختر القسم لعرض سجل المراسلات:", reply_markup=InlineKeyboardMarkup(inline_keyboard=keyboard))
 
-@router.callback_query(F.data.startswith("logs:view:"))
-async def view_logs_by_button(callback: CallbackQuery):
-    button_id = int(callback.data.split(":")[-1])
-    btn = db.get_button_by_id(button_id)
-    messages = db.get_messages_by_button(button_id)
-    
-    if not messages:
-        await callback.message.edit_text(f"📜 سجل {btn['text']} فارغ حالياً.", reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="⬅️ رجوع", callback_data="admin:logs")]]))
+@router.callback_query(F.data == "admin:admin_logs")
+async def show_admin_logs(callback: CallbackQuery):
+    if not is_super_admin_user(callback.from_user.id):
+        await callback.answer("للأدمن الأساسي فقط", show_alert=True)
         return
 
-    # Process messages to group by user or just show chronologically
-    logs_text = f"📜 **سجل مراسلات قسم: {btn['text']}**\n━━━━━━━━━━━━━━━\n\n"
-    
-    # We'll show the last 10-15 messages to avoid character limit, with basic info
-    for msg in messages[-15:]:
-        sender_type = "👤 مستخدم" if not msg['is_from_admin'] else f"👮 مشرف ({msg['admin_name'] or 'غير معروف'})"
-        sender_info = f"{msg['full_name']} ({msg['user_id']})" if not msg['is_from_admin'] else sender_type
-        
-        logs_text += f"📅 `{msg['timestamp']}`\n"
-        logs_text += f"**{sender_info}:**\n"
-        logs_text += f"{msg['message_text']}\n"
+    logs = db.get_admin_logs(15)
+    if not logs:
+        await callback.message.edit_text("🛡️ سجل المشرفين فارغ حالياً.", reply_markup=back_to_admin_button())
+        return
+
+    logs_text = "🛡️ **سجل عمليات المشرفين**\n━━━━━━━━━━━━━━━\n\n"
+    for log in logs:
+        logs_text += f"📅 `{log['timestamp']}`\n"
+        logs_text += f"👮 **{log['admin_name']}**\n"
+        logs_text += f"🔹 الإجراء: {log['action_type']}\n"
+        logs_text += f"📂 القسم: {log['section']}\n"
+        logs_text += f"📝 تفاصيل: {log['details']}\n"
         logs_text += "────────────────\n"
 
-    await callback.message.edit_text(logs_text, reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="⬅️ رجوع", callback_data="admin:logs")]]), parse_mode="Markdown")
+    await callback.message.edit_text(logs_text, reply_markup=back_to_admin_button(), parse_mode="Markdown")

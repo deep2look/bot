@@ -266,6 +266,13 @@ class Database:
         """, (button_id,))
         return self.cursor.fetchall()
 
-    def get_contact_buttons(self):
-        self.cursor.execute("SELECT * FROM buttons WHERE type = 'contact'")
+    def add_admin_log(self, admin_id, admin_name, action_type, section, details):
+        self.cursor.execute("""
+            INSERT INTO admin_logs (admin_id, admin_name, action_type, section, details)
+            VALUES (?, ?, ?, ?, ?)
+        """, (admin_id, admin_name, action_type, section, details))
+        self.conn.commit()
+
+    def get_admin_logs(self, limit=20):
+        self.cursor.execute("SELECT * FROM admin_logs ORDER BY timestamp DESC LIMIT ?", (limit,))
         return self.cursor.fetchall()
