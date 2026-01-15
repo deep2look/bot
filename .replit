@@ -1,0 +1,36 @@
+modules = ["python-3.11"]
+[nix]
+channel = "stable-25_05"
+packages = ["unzip"]
+
+[agent]
+expertMode = true
+
+[userenv]
+
+[userenv.shared]
+BOT_TOKEN = "8132170447:AAEI5uP2HY7mxyckwmXSCPof-LL00L1BcDI"
+SUPER_ADMIN_ID = " 7024606747"
+
+[workflows]
+runButton = "Project"
+
+[[workflows.workflow]]
+name = "Project"
+mode = "parallel"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Run Bot"
+
+[[workflows.workflow]]
+name = "Run Bot"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python bot.py"
+
+[workflows.workflow.metadata]
+outputType = "console"
