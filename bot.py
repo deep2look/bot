@@ -98,10 +98,11 @@ async def main():
     async def admin_panel_handler(message: Message):
         telegram_id = message.from_user.id
         user = db.get_user_by_telegram_id(telegram_id)
-        if user["role"] in ("super_admin", "admin", "supervisor"):
+        if user and user["role"] in ("super_admin", "admin", "supervisor"):
+            from admin_interface import admin_main_keyboard_markup
             await message.answer(
-                "🔧 أهلاً بك في لوحة التحكم العلوية",
-                reply_markup=admin_main_keyboard()
+                "🔧 أهلاً بك في لوحة التحكم",
+                reply_markup=admin_main_keyboard_markup()
             )
         else:
             await message.answer("عذراً، ليس لديك صلاحية الوصول.")
