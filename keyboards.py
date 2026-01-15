@@ -3,15 +3,30 @@
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardMarkup, KeyboardButton
 
 
+from database import Database
+
 # ======================
 # Main User Menu (Reply Keyboard)
 # ======================
 def main_menu_keyboard(is_admin=False):
+    db = Database()
     keyboard = []
+    
     if is_admin:
         keyboard.append([KeyboardButton(text="🔧 لوحة التحكم")])
     
-    # You can add more buttons here that everyone sees
+    # Add dynamic buttons from database
+    dynamic_buttons = db.get_buttons()
+    temp_row = []
+    for btn in dynamic_buttons:
+        temp_row.append(KeyboardButton(text=btn['text']))
+        if len(temp_row) == 2:  # 2 buttons per row
+            keyboard.append(temp_row)
+            temp_row = []
+    if temp_row:
+        keyboard.append(temp_row)
+    
+    # Default static buttons
     keyboard.append([KeyboardButton(text="ℹ️ معلومات"), KeyboardButton(text="🆘 الدعم")])
     
     return ReplyKeyboardMarkup(

@@ -122,7 +122,7 @@ class Database:
     # ======================
     # Buttons
     # ======================
-    def add_button(self, text, btn_type, content, parent_id, created_by):
+    def add_button(self, text, btn_type, content, parent_id=None, created_by=None):
         self.cursor.execute("""
         INSERT INTO buttons (text, type, content, parent_id, created_by)
         VALUES (?, ?, ?, ?, ?)
@@ -140,6 +140,21 @@ class Database:
                 (parent_id,)
             )
         return self.cursor.fetchall()
+
+    def delete_button(self, button_id):
+        self.cursor.execute("DELETE FROM buttons WHERE id = ?", (button_id,))
+        self.conn.commit()
+
+    def update_button(self, button_id, text=None, content=None):
+        if text:
+            self.cursor.execute("UPDATE buttons SET text = ? WHERE id = ?", (text, button_id))
+        if content:
+            self.cursor.execute("UPDATE buttons SET content = ? WHERE id = ?", (content, button_id))
+        self.conn.commit()
+
+    def get_button_by_id(self, button_id):
+        self.cursor.execute("SELECT * FROM buttons WHERE id = ?", (button_id,))
+        return self.cursor.fetchone()
 # ======================
 # Admins / Supervisors
 # ======================

@@ -11,6 +11,7 @@ from config import BOT_TOKEN, SUPER_ADMIN_ID
 from database import Database
 from aiogram.fsm.storage.memory import MemoryStorage
 from admin_interface import router as admin_router
+from user_interface import router as user_router
 from keyboards import admin_main_keyboard, main_menu_keyboard
 
 
@@ -76,6 +77,7 @@ async def main():
     await on_startup()
     dp.include_router(router)
     dp.include_router(admin_router)
+    dp.include_router(user_router)
     await dp.start_polling(bot)
 
 
