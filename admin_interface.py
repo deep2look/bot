@@ -29,6 +29,7 @@ def admin_main_keyboard_markup():
         [InlineKeyboardButton(text="👥 إدارة المشرفين", callback_data="admin:managers")],
         [InlineKeyboardButton(text="🧱 إدارة الأزرار", callback_data="admin:buttons_list")],
         [InlineKeyboardButton(text="📊 الإحصائيات", callback_data="admin:stats")],
+        [InlineKeyboardButton(text="⬅️ إغلاق", callback_data="admin:close")]
     ])
 
 def managers_keyboard_markup():
@@ -38,12 +39,18 @@ def managers_keyboard_markup():
         [InlineKeyboardButton(text="⬅️ رجوع", callback_data="admin:panel")],
     ])
 
+def back_to_admin_button():
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="⬅️ رجوع", callback_data="admin:panel")]
+    ])
+
 # ======================
 # Handlers
 # ======================
 @router.callback_query(F.data == "admin:panel")
 @router.callback_query(F.data == "admin:back")
-async def admin_panel_view(callback: CallbackQuery):
+async def admin_panel_view(callback: CallbackQuery, state: FSMContext):
+    await state.clear() # Clear state if returning from a flow
     if not is_admin_user(callback.from_user.id):
         await callback.answer("غير مصرح", show_alert=True)
         return
@@ -52,6 +59,10 @@ async def admin_panel_view(callback: CallbackQuery):
         "🔧 لوحة التحكم",
         reply_markup=admin_main_keyboard_markup()
     )
+
+@router.callback_query(F.data == "admin:close")
+async def close_admin_panel(callback: CallbackQuery):
+    await callback.message.delete()
 
 @router.callback_query(F.data == "admin:managers")
 @router.callback_query(F.data == "admin:supervisors")
@@ -87,13 +98,13 @@ async def list_buttons_admin_view(callback: CallbackQuery):
 async def stats_handler_view(callback: CallbackQuery):
     await callback.message.edit_text(
         "📊 إحصائيات البوت:\n\nقريباً سيتم عرض إحصائيات مفصلة هنا.",
-        reply_markup=admin_main_keyboard_markup()
+        reply_markup=back_to_admin_button()
     )
 
 @router.callback_query(F.data == "button:add")
 async def add_button_start_handler(callback: CallbackQuery, state: FSMContext):
     await state.set_state(ManageButtons.waiting_for_text)
-    await callback.message.edit_text("أرسل نص الزر الذي سيظهر للمستخدمين:")
+    await callback.message.edit_text("أرسل نص الزر الذي سيظهر للمستخدمين:", reply_markup=back_to_admin_button())
 
 @router.message(ManageButtons.waiting_for_text)
 async def add_button_text_handler(message: Message, state: FSMContext):
@@ -101,7 +112,8 @@ async def add_button_text_handler(message: Message, state: FSMContext):
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="نص (رسالة)", callback_data="type:text")],
         [InlineKeyboardButton(text="رابط (URL)", callback_data="type:url")],
-        [InlineKeyboardButton(text="تواصل (Contact)", callback_data="type:contact")]
+        [InlineKeyboardButton(text="تواصل (Contact)", callback_data="type:contact")],
+        [InlineKeyboardButton(text="⬅️ رجوع", callback_data="admin:panel")]
     ])
     await state.set_state(ManageButtons.waiting_for_type)
     await message.answer("اختر نوع الزر:", reply_markup=keyboard)
@@ -113,11 +125,11 @@ async def add_button_type_handler(callback: CallbackQuery, state: FSMContext):
     await state.set_state(ManageButtons.waiting_for_content)
     
     if btn_type == "text":
-        await callback.message.edit_text("أرسل النص الذي سيقوم البوت بإرساله عند الضغط على الزر:")
+        await callback.message.edit_text("أرسل النص الذي سيقوم البوت بإرساله عند الضغط على الزر:", reply_markup=back_to_admin_button())
     elif btn_type == "url":
-        await callback.message.edit_text("أرسل الرابط (http://...):")
+        await callback.message.edit_text("أرسل الرابط (http://...):", reply_markup=back_to_admin_button())
     elif btn_type == "contact":
-        await callback.message.edit_text("أرسل المعرف أو رقم الهاتف للتواصل:")
+        await callback.message.edit_text("أرسل المعرف أو رقم الهاتف للتواصل:", reply_markup=back_to_admin_button())
 
 @router.message(ManageButtons.waiting_for_content)
 async def add_button_finish_handler(message: Message, state: FSMContext):
@@ -145,19 +157,20 @@ async def delete_button_handler_view(callback: CallbackQuery):
 async def add_manager_start_view(callback: CallbackQuery, state: FSMContext):
     await state.set_state(AddSupervisor.waiting_for_username)
     await callback.message.edit_text(
-        "📥 أرسل معرف المشرف (بدون @)\nمثال: username"
+        "📥 أرسل معرف المشرف (بدون @)\nمثال: username",
+        reply_markup=back_to_admin_button()
     )
 
 @router.message(AddSupervisor.waiting_for_username)
 async def add_manager_finish_view(message: Message, state: FSMContext, bot: Bot):
     username = message.text.strip().lstrip("@")
     if not username.isalnum():
-        await message.answer("❌ معرف غير صالح")
+        await message.answer("❌ معرف غير صالح", reply_markup=back_to_admin_button())
         return
     try:
         chat = await bot.get_chat(f"@{username}")
     except Exception:
-        await message.answer("❌ لم يتم العثور على مستخدم بهذا المعرف")
+        await message.answer("❌ لم يتم العثور على مستخدم بهذا المعرف", reply_markup=back_to_admin_button())
         return
     telegram_id = chat.id
     db.add_user(telegram_id=telegram_id, role="supervisor")
