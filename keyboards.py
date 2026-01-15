@@ -12,7 +12,7 @@ def main_menu_keyboard(is_admin=False):
     db = Database()
     keyboard = []
     
-    # Only show admin panel button if the user is an admin
+    # Always show refresh button
     if is_admin:
         keyboard.append([KeyboardButton(text="🔄 تحديث البوت"), KeyboardButton(text="🔧 لوحة التحكم")])
     else:
@@ -23,14 +23,11 @@ def main_menu_keyboard(is_admin=False):
     temp_row = []
     for btn in dynamic_buttons:
         temp_row.append(KeyboardButton(text=btn['text']))
-        if len(temp_row) == 2:  # 2 buttons per row
+        if len(row) == 2:  # 2 buttons per row
             keyboard.append(temp_row)
             temp_row = []
     if temp_row:
         keyboard.append(temp_row)
-    
-    # Static buttons (optional, can be removed if user wants only their buttons)
-    # keyboard.append([KeyboardButton(text="ℹ️ معلومات"), KeyboardButton(text="🆘 الدعم")])
     
     return ReplyKeyboardMarkup(
         keyboard=keyboard,

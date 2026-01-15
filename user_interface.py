@@ -11,6 +11,10 @@ db = Database()
 def get_user_keyboard(parent_id=None):
     buttons = db.get_buttons(parent_id)
     kb_buttons = []
+    
+    # Always add the refresh button at the top
+    kb_buttons.append([KeyboardButton(text="🔄 تحديث البوت")])
+    
     row = []
     for btn in buttons:
         row.append(KeyboardButton(text=btn['text']))
