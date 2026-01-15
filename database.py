@@ -123,23 +123,44 @@ class Database:
     # Buttons
     # ======================
     def add_button(self, text, btn_type, content, parent_id=None, created_by=None):
+        self.cursor.execute("SELECT COUNT(*) FROM buttons")
+        count = self.cursor.fetchone()[0]
         self.cursor.execute("""
-        INSERT INTO buttons (text, type, content, parent_id, created_by)
-        VALUES (?, ?, ?, ?, ?)
-        """, (text, btn_type, content, parent_id, created_by))
+        INSERT INTO buttons (text, type, content, parent_id, created_by, position)
+        VALUES (?, ?, ?, ?, ?, ?)
+        """, (text, btn_type, content, parent_id, created_by, count))
         self.conn.commit()
 
     def get_buttons(self, parent_id=None):
         if parent_id is None:
             self.cursor.execute(
-                "SELECT * FROM buttons WHERE parent_id IS NULL AND is_active = 1"
+                "SELECT * FROM buttons WHERE parent_id IS NULL AND is_active = 1 ORDER BY position ASC"
             )
         else:
             self.cursor.execute(
-                "SELECT * FROM buttons WHERE parent_id = ? AND is_active = 1",
+                "SELECT * FROM buttons WHERE parent_id = ? AND is_active = 1 ORDER BY position ASC",
                 (parent_id,)
             )
         return self.cursor.fetchall()
+
+    def move_button(self, button_id, direction):
+        # direction: 'up' or 'down'
+        self.cursor.execute("SELECT position FROM buttons WHERE id = ?", (button_id,))
+        current_pos = self.cursor.fetchone()[0]
+        
+        if direction == 'up':
+            self.cursor.execute("SELECT id, position FROM buttons WHERE position < ? ORDER BY position DESC LIMIT 1", (current_pos,))
+        else:
+            self.cursor.execute("SELECT id, position FROM buttons WHERE position > ? ORDER BY position ASC LIMIT 1", (current_pos,))
+            
+        other = self.cursor.fetchone()
+        if other:
+            other_id, other_pos = other
+            self.cursor.execute("UPDATE buttons SET position = ? WHERE id = ?", (other_pos, button_id))
+            self.cursor.execute("UPDATE buttons SET position = ? WHERE id = ?", (current_pos, other_id))
+            self.conn.commit()
+            return True
+        return False
 
     def delete_button(self, button_id):
         self.cursor.execute("DELETE FROM buttons WHERE id = ?", (button_id,))

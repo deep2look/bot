@@ -83,16 +83,30 @@ async def list_buttons_admin_view(callback: CallbackQuery):
     for btn in buttons:
         keyboard.append([
             InlineKeyboardButton(text=f"📝 {btn['text']}", callback_data=f"btn_edit:{btn['id']}"),
-            InlineKeyboardButton(text="❌ حذف", callback_data=f"btn_del:{btn['id']}")
+            InlineKeyboardButton(text="🔼", callback_data=f"btn_move:up:{btn['id']}"),
+            InlineKeyboardButton(text="🔽", callback_data=f"btn_move:down:{btn['id']}"),
+            InlineKeyboardButton(text="❌", callback_data=f"btn_del:{btn['id']}")
         ])
     
     keyboard.append([InlineKeyboardButton(text="➕ إضافة زر", callback_data="button:add")])
     keyboard.append([InlineKeyboardButton(text="⬅️ رجوع", callback_data="admin:panel")])
     
     await callback.message.edit_text(
-        "🧱 إدارة الأزرار:\nاضغط على اسم الزر لتعديله أو علامة الحذف لإزالته.",
+        "🧱 إدارة الأزرار:\n\n🔼/🔽: لتغيير الترتيب (أعلى/أسفل).\n📝: للتعديل.\n❌: للحذف.",
         reply_markup=InlineKeyboardMarkup(inline_keyboard=keyboard)
     )
+
+@router.callback_query(F.data.startswith("btn_move:"))
+async def move_button_handler(callback: CallbackQuery):
+    parts = callback.data.split(":")
+    direction = parts[1]
+    btn_id = int(parts[2])
+    
+    if db.move_button(btn_id, direction):
+        await callback.answer("تم تغيير الترتيب")
+        await list_buttons_admin_view(callback)
+    else:
+        await callback.answer("لا يمكن التحريك أكثر من ذلك", show_alert=False)
 
 @router.callback_query(F.data == "admin:stats")
 async def stats_handler_view(callback: CallbackQuery):
