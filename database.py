@@ -176,25 +176,26 @@ class Database:
     def get_button_by_id(self, button_id):
         self.cursor.execute("SELECT * FROM buttons WHERE id = ?", (button_id,))
         return self.cursor.fetchone()
-# ======================
-# Admins / Supervisors
-# ======================
-def get_admins(self):
-    self.cursor.execute(
-        "SELECT * FROM users WHERE role IN ('admin', 'supervisor')"
-    )
-    return self.cursor.fetchall()
 
-def update_user_role(self, telegram_id, role):
-    self.cursor.execute(
-        "UPDATE users SET role = ? WHERE telegram_id = ?",
-        (role, telegram_id)
-    )
-    self.conn.commit()
+    # ======================
+    # Admins / Supervisors
+    # ======================
+    def get_admins(self):
+        self.cursor.execute(
+            "SELECT * FROM users WHERE role IN ('admin', 'supervisor')"
+        )
+        return self.cursor.fetchall()
 
-def set_user_active(self, telegram_id, is_active: int):
-    self.cursor.execute(
-        "UPDATE users SET is_active = ? WHERE telegram_id = ?",
-        (is_active, telegram_id)
-    )
-    self.conn.commit()
+    def update_user_role(self, telegram_id, role):
+        self.cursor.execute(
+            "UPDATE users SET role = ? WHERE telegram_id = ?",
+            (role, telegram_id)
+        )
+        self.conn.commit()
+
+    def set_user_active(self, telegram_id, is_active: int):
+        self.cursor.execute(
+            "UPDATE users SET is_active = ? WHERE telegram_id = ?",
+            (is_active, telegram_id)
+        )
+        self.conn.commit()
