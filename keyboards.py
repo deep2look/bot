@@ -14,7 +14,9 @@ def main_menu_keyboard(is_admin=False):
     
     # Only show admin panel button if the user is an admin
     if is_admin:
-        keyboard.append([KeyboardButton(text="🔧 لوحة التحكم")])
+        keyboard.append([KeyboardButton(text="🔄 تحديث البوت"), KeyboardButton(text="🔧 لوحة التحكم")])
+    else:
+        keyboard.append([KeyboardButton(text="🔄 تحديث البوت")])
     
     # Add dynamic buttons from database
     dynamic_buttons = db.get_buttons()

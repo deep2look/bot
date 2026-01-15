@@ -58,6 +58,10 @@ async def start_handler(message: Message):
         reply_markup=main_menu_keyboard(is_admin=is_admin)
     )
 
+@router.message(lambda message: message.text == "🔄 تحديث البوت")
+async def refresh_bot_handler(message: Message):
+    await start_handler(message)
+
 @router.message(lambda message: message.text == "🔧 لوحة التحكم")
 async def admin_panel_handler(message: Message):
     telegram_id = message.from_user.id
