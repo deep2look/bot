@@ -42,6 +42,7 @@ def managers_keyboard():
 # Handlers
 # ======================
 @router.callback_query(F.data == "admin:panel")
+@router.callback_query(F.data == "admin:back")
 async def admin_panel(callback: CallbackQuery):
     if not is_admin(callback.from_user.id):
         await callback.answer("غير مصرح", show_alert=True)
@@ -52,16 +53,17 @@ async def admin_panel(callback: CallbackQuery):
         reply_markup=admin_main_keyboard()
     )
 
+
 @router.callback_query(F.data == "admin:managers")
+@router.callback_query(F.data == "admin:supervisors")
 async def managers_menu(callback: CallbackQuery):
     await callback.message.edit_text(
         "👥 إدارة المشرفين",
         reply_markup=managers_keyboard()
     )
 
-# ======================
-# Buttons Management
-# ======================
+
+@router.callback_query(F.data == "admin:buttons")
 @router.callback_query(F.data == "admin:buttons_list")
 async def list_buttons_admin(callback: CallbackQuery):
     buttons = db.get_buttons()
@@ -78,6 +80,16 @@ async def list_buttons_admin(callback: CallbackQuery):
     await callback.message.edit_text(
         "🧱 إدارة الأزرار:\nاضغط على اسم الزر لتعديله أو علامة الحذف لإزالته.",
         reply_markup=InlineKeyboardMarkup(inline_keyboard=keyboard)
+    )
+
+
+@router.callback_query(F.data == "admin:stats")
+async def stats_handler(callback: CallbackQuery):
+    # Basic stats as a placeholder
+    users_count = 0  # Should be implemented in database.py
+    await callback.message.edit_text(
+        "📊 إحصائيات البوت:\n\nقريباً سيتم عرض إحصائيات مفصلة هنا.",
+        reply_markup=admin_main_keyboard()
     )
 
 @router.callback_query(F.data == "button:add")
