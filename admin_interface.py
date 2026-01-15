@@ -76,10 +76,25 @@ async def managers_menu_view(callback: CallbackQuery):
 # Buttons Management
 # ======================
 @router.callback_query(F.data == "admin:buttons")
+@router.callback_query(F.data.startswith("admin:buttons_list:"))
 @router.callback_query(F.data == "admin:buttons_list")
 async def list_buttons_admin_view(callback: CallbackQuery):
-    buttons = db.get_buttons()
+    parent_id = None
+    if callback.data.startswith("admin:buttons_list:"):
+        parts = callback.data.split(":")
+        if len(parts) > 2:
+            parent_id = int(parts[-1])
+    
+    buttons = db.get_buttons(parent_id)
     keyboard = []
+    
+    parent_text = ""
+    if parent_id:
+        parent_btn = db.get_button_by_id(parent_id)
+        parent_text = f" (داخل: {parent_btn['text']})"
+        back_id = parent_btn['parent_id']
+        keyboard.append([InlineKeyboardButton(text="⬅️ مستوى للأعلى", callback_data=f"admin:buttons_list:{back_id}" if back_id else "admin:buttons_list")])
+
     for btn in buttons:
         keyboard.append([
             InlineKeyboardButton(text=f"📝 {btn['text']}", callback_data=f"btn_edit:{btn['id']}"),
@@ -88,35 +103,48 @@ async def list_buttons_admin_view(callback: CallbackQuery):
             InlineKeyboardButton(text="❌", callback_data=f"btn_del:{btn['id']}")
         ])
     
-    keyboard.append([InlineKeyboardButton(text="➕ إضافة زر", callback_data="button:add")])
-    keyboard.append([InlineKeyboardButton(text="⬅️ رجوع", callback_data="admin:panel")])
+    keyboard.append([InlineKeyboardButton(text="➕ إضافة زر هنا", callback_data=f"button:add:{parent_id}" if parent_id else "button:add")])
+    if not parent_id:
+        keyboard.append([InlineKeyboardButton(text="⬅️ القائمة الرئيسية", callback_data="admin:panel")])
     
     await callback.message.edit_text(
-        "🧱 إدارة الأزرار:\n\n🔼/🔽: لتغيير الترتيب (أعلى/أسفل).\n📝: للتعديل.\n❌: للحذف.",
+        f"🧱 إدارة الأزرار{parent_text}:\n\n🔼/🔽: للترتيب.\n📝: للتعديل والدخول للأزرار الفرعية.\n❌: للحذف.",
         reply_markup=InlineKeyboardMarkup(inline_keyboard=keyboard)
     )
 
-@router.callback_query(F.data.startswith("btn_move:"))
-async def move_button_handler(callback: CallbackQuery):
-    parts = callback.data.split(":")
-    direction = parts[1]
-    btn_id = int(parts[2])
+@router.callback_query(F.data.startswith("btn_edit:"))
+async def edit_button_handler(callback: CallbackQuery, state: FSMContext):
+    btn_id = int(callback.data.split(":")[-1])
+    btn = db.get_button_by_id(btn_id)
     
-    if db.move_button(btn_id, direction):
-        await callback.answer("تم تغيير الترتيب")
-        await list_buttons_admin_view(callback)
-    else:
-        await callback.answer("لا يمكن التحريك أكثر من ذلك", show_alert=False)
+    if not btn:
+        await callback.answer("الزر غير موجود")
+        return
 
-@router.callback_query(F.data == "admin:stats")
-async def stats_handler_view(callback: CallbackQuery):
+    await state.update_data(edit_btn_id=btn_id)
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="📂 الأزرار الفرعية (داخل هذا الزر)", callback_data=f"admin:buttons_list:{btn_id}")],
+        [InlineKeyboardButton(text="✏️ تغيير الاسم", callback_data=f"btn_edit_field:text:{btn_id}")],
+        [InlineKeyboardButton(text="📝 تغيير المحتوى", callback_data=f"btn_edit_field:content:{btn_id}")],
+        [InlineKeyboardButton(text="⬅️ رجوع", callback_data=f"admin:buttons_list:{btn['parent_id']}" if btn['parent_id'] else "admin:buttons_list")]
+    ])
+    
     await callback.message.edit_text(
-        "📊 إحصائيات البوت:\n\nقريباً سيتم عرض إحصائيات مفصلة هنا.",
-        reply_markup=back_to_admin_button()
+        f"📝 تعديل الزر: {btn['text']}\n"
+        f"النوع: {btn['type']}\n"
+        f"المحتوى الحالي: {btn['content']}\n\n"
+        "ماذا تريد أن تعدل؟ أو أضف أزراراً فرعية بالداخل.",
+        reply_markup=keyboard
     )
 
-@router.callback_query(F.data == "button:add")
+@router.callback_query(F.data.startswith("button:add"))
 async def add_button_start_handler(callback: CallbackQuery, state: FSMContext):
+    parent_id = None
+    parts = callback.data.split(":")
+    if len(parts) > 2:
+        parent_id = int(parts[2])
+    
+    await state.update_data(parent_id=parent_id)
     await state.set_state(ManageButtons.waiting_for_text)
     await callback.message.edit_text("أرسل نص الزر الذي سيظهر للمستخدمين:", reply_markup=back_to_admin_button())
 
@@ -152,42 +180,11 @@ async def add_button_finish_handler(message: Message, state: FSMContext):
         text=data['text'],
         btn_type=data['type'],
         content=message.text,
+        parent_id=data.get('parent_id'),
         created_by=message.from_user.id
     )
     await state.clear()
     await message.answer("✅ تم إضافة الزر بنجاح!", reply_markup=admin_main_keyboard_markup())
-
-@router.callback_query(F.data.startswith("btn_del:"))
-async def delete_button_handler_view(callback: CallbackQuery):
-    btn_id = int(callback.data.split(":")[-1])
-    db.delete_button(btn_id)
-    await callback.answer("✅ تم حذف الزر")
-    await list_buttons_admin_view(callback)
-
-
-@router.callback_query(F.data.startswith("btn_edit:"))
-async def edit_button_handler(callback: CallbackQuery, state: FSMContext):
-    btn_id = int(callback.data.split(":")[-1])
-    btn = db.get_button_by_id(btn_id)
-    
-    if not btn:
-        await callback.answer("الزر غير موجود")
-        return
-
-    await state.update_data(edit_btn_id=btn_id)
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="✏️ تغيير الاسم", callback_data=f"btn_edit_field:text:{btn_id}")],
-        [InlineKeyboardButton(text="📝 تغيير المحتوى", callback_data=f"btn_edit_field:content:{btn_id}")],
-        [InlineKeyboardButton(text="⬅️ رجوع", callback_data="admin:buttons_list")]
-    ])
-    
-    await callback.message.edit_text(
-        f"📝 تعديل الزر: {btn['text']}\n"
-        f"النوع: {btn['type']}\n"
-        f"المحتوى الحالي: {btn['content']}\n\n"
-        "ماذا تريد أن تعدل؟",
-        reply_markup=keyboard
-    )
 
 @router.callback_query(F.data.startswith("btn_edit_field:"))
 async def edit_button_field_handler(callback: CallbackQuery, state: FSMContext):
