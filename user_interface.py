@@ -1,6 +1,6 @@
 # user_interface.py
 
-from aiogram import Router, F
+from aiogram import Router, F, Bot
 from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
 from database import Database
 from aiogram.fsm.context import FSMContext
@@ -51,12 +51,11 @@ async def back_menu_handler(message: Message, state: FSMContext):
     await message.answer("العودة للخلف...", reply_markup=get_user_keyboard(grandparent_id))
 
 from states import SupportState
-from bot import bot
 
 # ... existing code ...
 
 @router.message(SupportState.waiting_for_message)
-async def user_submit_support(message: Message, state: FSMContext):
+async def user_submit_support(message: Message, state: FSMContext, bot: Bot):
     if message.text == "🔄 تحديث البوت" or message.text == "🏠 القائمة الرئيسية":
         await state.clear()
         return

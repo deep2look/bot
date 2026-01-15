@@ -28,7 +28,6 @@ logging.basicConfig(level=logging.INFO)
 # ======================
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher(storage=MemoryStorage())
-router = Router()
 db = Database()
 
 
@@ -41,49 +40,42 @@ async def on_startup():
 
 
 # ======================
-# Handlers
-# ======================
-@router.message(CommandStart())
-async def start_handler(message: Message):
-    telegram_id = message.from_user.id
-
-    db.add_user(telegram_id=telegram_id)
-    user = db.get_user_by_telegram_id(telegram_id)
-
-    is_admin = user["role"] in ("super_admin", "admin", "supervisor")
-    
-    await message.answer(
-        f"👋 مرحبًا بك {message.from_user.full_name}\n"
-        "المحتوى سيظهر هنا عند تفعيله من الإدارة.",
-        reply_markup=main_menu_keyboard(is_admin=is_admin)
-    )
-
-@router.message(lambda message: message.text == "🔄 تحديث البوت")
-async def refresh_bot_handler(message: Message):
-    await start_handler(message)
-
-@router.message(lambda message: message.text == "🔧 لوحة التحكم")
-async def admin_panel_handler(message: Message):
-    telegram_id = message.from_user.id
-    user = db.get_user_by_telegram_id(telegram_id)
-    
-    if user["role"] in ("super_admin", "admin", "supervisor"):
-        await message.answer(
-            "🔧 أهلاً بك في لوحة التحكم العلوية",
-            reply_markup=admin_main_keyboard()
-        )
-    else:
-        await message.answer("عذراً، ليس لديك صلاحية الوصول.")
-
-
-# ======================
 # Main
 # ======================
 async def main():
     await on_startup()
-    dp.include_router(router)
     dp.include_router(admin_router)
     dp.include_router(user_router)
+    
+    # Simple start handler inside bot.py to avoid circular import
+    @dp.message(CommandStart())
+    async def start_handler(message: Message):
+        telegram_id = message.from_user.id
+        db.add_user(telegram_id=telegram_id)
+        user = db.get_user_by_telegram_id(telegram_id)
+        is_admin = user["role"] in ("super_admin", "admin", "supervisor")
+        await message.answer(
+            f"👋 مرحبًا بك {message.from_user.full_name}\n"
+            "المحتوى سيظهر هنا عند تفعيله من الإدارة.",
+            reply_markup=main_menu_keyboard(is_admin=is_admin)
+        )
+
+    @dp.message(lambda message: message.text == "🔄 تحديث البوت")
+    async def refresh_bot_handler(message: Message):
+        await start_handler(message)
+
+    @dp.message(lambda message: message.text == "🔧 لوحة التحكم")
+    async def admin_panel_handler(message: Message):
+        telegram_id = message.from_user.id
+        user = db.get_user_by_telegram_id(telegram_id)
+        if user["role"] in ("super_admin", "admin", "supervisor"):
+            await message.answer(
+                "🔧 أهلاً بك في لوحة التحكم العلوية",
+                reply_markup=admin_main_keyboard()
+            )
+        else:
+            await message.answer("عذراً، ليس لديك صلاحية الوصول.")
+
     await dp.start_polling(bot)
 
 
