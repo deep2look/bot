@@ -45,8 +45,21 @@ class Database:
             parent_id INTEGER,
             is_active INTEGER DEFAULT 1,
             created_by INTEGER,
+            position INTEGER,
             FOREIGN KEY (parent_id) REFERENCES buttons (id),
             FOREIGN KEY (created_by) REFERENCES users (id)
+        )
+        """)
+
+        # Messages (Support System)
+        self.cursor.execute("""
+        CREATE TABLE IF NOT EXISTS support_messages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            admin_id INTEGER,
+            message_text TEXT,
+            is_from_admin INTEGER DEFAULT 0,
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
         )
         """)
 
@@ -193,9 +206,12 @@ class Database:
         )
         self.conn.commit()
 
-    def set_user_active(self, telegram_id, is_active: int):
-        self.cursor.execute(
-            "UPDATE users SET is_active = ? WHERE telegram_id = ?",
-            (is_active, telegram_id)
-        )
+    # ======================
+    # Support Messages
+    # ======================
+    def add_support_message(self, user_id, message_text, is_from_admin=0, admin_id=None):
+        self.cursor.execute("""
+            INSERT INTO support_messages (user_id, message_text, is_from_admin, admin_id)
+            VALUES (?, ?, ?, ?)
+        """, (user_id, message_text, is_from_admin, admin_id))
         self.conn.commit()

@@ -11,3 +11,7 @@ class ManageButtons(StatesGroup):
     waiting_for_new_text = State()
     waiting_for_new_content = State()
 
+class SupportState(StatesGroup):
+    waiting_for_message = State()
+    waiting_for_reply = State()
+

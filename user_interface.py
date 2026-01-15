@@ -50,6 +50,45 @@ async def back_menu_handler(message: Message, state: FSMContext):
     await state.update_data(current_parent_id=grandparent_id)
     await message.answer("العودة للخلف...", reply_markup=get_user_keyboard(grandparent_id))
 
+from states import SupportState
+from bot import bot
+
+# ... existing code ...
+
+@router.message(SupportState.waiting_for_message)
+async def user_submit_support(message: Message, state: FSMContext):
+    if message.text == "🔄 تحديث البوت" or message.text == "🏠 القائمة الرئيسية":
+        await state.clear()
+        return
+
+    # Save to DB
+    db.add_support_message(message.from_user.id, message.text)
+    
+    # Notify Admins
+    admins = db.get_admins()
+    # Also include super admin
+    from config import SUPER_ADMIN_ID
+    admin_ids = [admin['telegram_id'] for admin in admins]
+    if SUPER_ADMIN_ID not in admin_ids:
+        admin_ids.append(SUPER_ADMIN_ID)
+        
+    for admin_id in admin_ids:
+        try:
+            kb = InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="💬 رد على المستخدم", callback_data=f"support:reply:{message.from_user.id}")]
+            ])
+            await bot.send_message(
+                admin_id, 
+                f"📥 **رسالة دعم جديدة**\nمن: {message.from_user.full_name} ({message.from_user.id})\n\nالرسالة:\n{message.text}",
+                reply_markup=kb,
+                parse_mode="Markdown"
+            )
+        except Exception:
+            pass
+
+    await message.answer("✅ تم إرسال رسالتك للإدارة. سيتم الرد عليك في أقرب وقت ممكن.")
+    await state.clear()
+
 @router.message()
 async def dynamic_button_handler(message: Message, state: FSMContext):
     if not message.text:
@@ -92,6 +131,8 @@ async def dynamic_button_handler(message: Message, state: FSMContext):
         ])
         await message.answer(f"إليك الرابط الخاص بـ {target_btn['text']}:", reply_markup=keyboard)
     elif target_btn['type'] == 'contact':
+        await state.set_state(SupportState.waiting_for_message)
         await message.answer(
-            f"📞 تواصل مع الإدارة بخصوص: {target_btn['text']}\n\n{target_btn['content']}"
+            f"🚀 أنت الآن في وضع التواصل المباشر مع الإدارة بخصوص: {target_btn['text']}\n\nأرسل رسالتك الآن وسيقوم أحد المشرفين بالرد عليك هنا.",
+            reply_markup=ReplyKeyboardMarkup(keyboard=[[KeyboardButton(text="🏠 القائمة الرئيسية")]], resize_keyboard=True)
         )

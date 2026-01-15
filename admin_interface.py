@@ -178,14 +178,25 @@ async def add_button_text_handler(message: Message, state: FSMContext):
 async def add_button_type_handler(callback: CallbackQuery, state: FSMContext):
     btn_type = callback.data.split(":")[-1]
     await state.update_data(type=btn_type)
-    await state.set_state(ManageButtons.waiting_for_content)
     
+    if btn_type == "contact":
+        data = await state.get_data()
+        db.add_button(
+            text=data['text'],
+            btn_type="contact",
+            content="Support System",
+            parent_id=data.get('parent_id'),
+            created_by=callback.from_user.id
+        )
+        await state.clear()
+        await callback.message.edit_text("✅ تم إضافة زر التواصل بنجاح! سيتمكن المستخدمون الآن من مراسلتكم مباشرة.", reply_markup=admin_main_keyboard_markup())
+        return
+
+    await state.set_state(ManageButtons.waiting_for_content)
     if btn_type == "text":
         await callback.message.edit_text("أرسل النص الذي سيقوم البوت بإرساله عند الضغط على الزر:", reply_markup=back_to_admin_button())
     elif btn_type == "url":
         await callback.message.edit_text("أرسل الرابط (http://...):", reply_markup=back_to_admin_button())
-    elif btn_type == "contact":
-        await callback.message.edit_text("أرسل المعرف أو رقم الهاتف للتواصل:", reply_markup=back_to_admin_button())
 
 @router.message(ManageButtons.waiting_for_content)
 async def add_button_finish_handler(message: Message, state: FSMContext):
@@ -356,9 +367,27 @@ async def disable_manager_handler(callback: CallbackQuery):
     await callback.answer("تم التعطيل")
     await manager_view_handler(callback)
 
-@router.callback_query(F.data.startswith("manager:enable:"))
-async def enable_manager_handler(callback: CallbackQuery):
-    telegram_id = int(callback.data.split(":")[-1])
-    db.set_user_active(telegram_id, 1)
-    await callback.answer("تم التفعيل")
-    await manager_view_handler(callback)
+# ======================
+# Support Reply Handlers
+# ======================
+@router.callback_query(F.data.startswith("support:reply:"))
+async def support_reply_start(callback: CallbackQuery, state: FSMContext):
+    user_id = int(callback.data.split(":")[-1])
+    await state.update_data(reply_to_user_id=user_id)
+    await state.set_state(SupportState.waiting_for_reply)
+    await callback.message.answer(f"أرسل ردك للمستخدم ({user_id}):", reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="إلغاء", callback_data="admin:panel")]]))
+    await callback.answer()
+
+@router.message(SupportState.waiting_for_reply)
+async def support_reply_process(message: Message, state: FSMContext, bot: Bot):
+    data = await state.get_data()
+    user_id = data.get("reply_to_user_id")
+    
+    try:
+        await bot.send_message(user_id, f"✉️ **رد من الإدارة:**\n\n{message.text}", parse_mode="Markdown")
+        db.add_support_message(user_id, message.text, is_from_admin=1, admin_id=message.from_user.id)
+        await message.answer("✅ تم إرسال الرد بنجاح.")
+    except Exception as e:
+        await message.answer(f"❌ فشل إرسال الرد: {e}")
+    
+    await state.clear()
