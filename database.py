@@ -221,8 +221,34 @@ class Database:
         self.conn.commit()
 
     # ======================
-    # Support Messages
+    # Permissions & Features
     # ======================
+    def get_features(self):
+        self.cursor.execute("SELECT * FROM features")
+        return self.cursor.fetchall()
+
+    def get_supervisor_permissions(self, telegram_id):
+        self.cursor.execute("SELECT feature_id FROM supervisor_permissions WHERE telegram_id = ?", (telegram_id,))
+        return [row['feature_id'] for row in self.cursor.fetchall()]
+
+    def set_supervisor_permission(self, telegram_id, feature_id, granted):
+        if granted:
+            self.cursor.execute("INSERT OR IGNORE INTO supervisor_permissions (telegram_id, feature_id) VALUES (?, ?)", (telegram_id, feature_id))
+        else:
+            self.cursor.execute("DELETE FROM supervisor_permissions WHERE telegram_id = ? AND feature_id = ?", (telegram_id, feature_id))
+        self.conn.commit()
+
+    def has_permission(self, telegram_id, feature_id):
+        user = self.get_user_by_telegram_id(telegram_id)
+        if not user: return False
+        if user['role'] in ('super_admin', 'admin'): return True
+        self.cursor.execute("SELECT 1 FROM supervisor_permissions WHERE telegram_id = ? AND feature_id = ?", (telegram_id, feature_id))
+        return bool(self.cursor.fetchone())
+
+    def delete_supervisor(self, telegram_id):
+        self.cursor.execute("DELETE FROM users WHERE telegram_id = ?", (telegram_id,))
+        self.cursor.execute("DELETE FROM supervisor_permissions WHERE telegram_id = ?", (telegram_id,))
+        self.conn.commit()
     def add_support_message(self, user_id, message_text, is_from_admin=0, admin_id=None, button_id=None, admin_name=None):
         self.cursor.execute("""
             INSERT INTO support_messages (user_id, message_text, is_from_admin, admin_id, button_id, admin_name)

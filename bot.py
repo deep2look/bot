@@ -102,7 +102,7 @@ async def main():
             from admin_interface import admin_main_keyboard_markup
             await message.answer(
                 "🔧 أهلاً بك في لوحة التحكم",
-                reply_markup=admin_main_keyboard_markup()
+                reply_markup=admin_main_keyboard_markup(telegram_id)
             )
         else:
             await message.answer("عذراً، ليس لديك صلاحية الوصول.")

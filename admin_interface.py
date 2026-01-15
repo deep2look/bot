@@ -24,14 +24,19 @@ def is_super_admin_user(telegram_id: int) -> bool:
 # ======================
 # Keyboards
 # ======================
-def admin_main_keyboard_markup():
-    return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="👥 إدارة المشرفين", callback_data="admin:managers")],
-        [InlineKeyboardButton(text="🧱 إدارة الأزرار", callback_data="admin:buttons_list")],
-        [InlineKeyboardButton(text="📊 الإحصائيات", callback_data="admin:stats")],
-        [InlineKeyboardButton(text="📜 سجل المراسلات", callback_data="admin:logs")],
-        [InlineKeyboardButton(text="⬅️ إغلاق", callback_data="admin:close")]
-    ])
+def admin_main_keyboard_markup(user_id):
+    is_super = is_super_admin_user(user_id)
+    buttons = []
+    if is_super or db.has_permission(user_id, 'managers'):
+        buttons.append([InlineKeyboardButton(text="👥 إدارة المشرفين", callback_data="admin:managers")])
+    if is_super or db.has_permission(user_id, 'buttons'):
+        buttons.append([InlineKeyboardButton(text="🧱 إدارة الأزرار", callback_data="admin:buttons_list")])
+    if is_super or db.has_permission(user_id, 'stats'):
+        buttons.append([InlineKeyboardButton(text="📊 الإحصائيات", callback_data="admin:stats")])
+    if is_super or db.has_permission(user_id, 'logs'):
+        buttons.append([InlineKeyboardButton(text="📜 سجل المراسلات", callback_data="admin:logs")])
+    buttons.append([InlineKeyboardButton(text="⬅️ إغلاق", callback_data="admin:close")])
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 def managers_keyboard_markup():
     return InlineKeyboardMarkup(inline_keyboard=[
@@ -60,13 +65,13 @@ async def admin_panel_view(callback: CallbackQuery, state: FSMContext):
     try:
         await callback.message.edit_text(
             "🔧 لوحة التحكم",
-            reply_markup=admin_main_keyboard_markup()
+            reply_markup=admin_main_keyboard_markup(callback.from_user.id)
         )
     except Exception:
         # In case edit fails (e.g. message text is same), try sending fresh message
         await callback.message.answer(
             "🔧 لوحة التحكم",
-            reply_markup=admin_main_keyboard_markup()
+            reply_markup=admin_main_keyboard_markup(callback.from_user.id)
         )
     await callback.answer()
 
@@ -367,21 +372,70 @@ async def list_managers_view(callback: CallbackQuery):
         reply_markup=InlineKeyboardMarkup(inline_keyboard=keyboard)
     )
 
-def manager_control_keyboard_markup(telegram_id: int, is_active: int):
+@router.callback_query(F.data.startswith("manager:perms:"))
+async def edit_manager_perms(callback: CallbackQuery):
+    parts = callback.data.split(":")
+    target_id = int(parts[2])
+    
+    if not is_super_admin_user(callback.from_user.id):
+        await callback.answer("عذراً، هذا الإجراء متاح للأدمن الأساسي فقط.", show_alert=True)
+        return
+
+    # Toggle if action is specified
+    if len(parts) > 3:
+        feature_id = parts[3]
+        current_perms = db.get_supervisor_permissions(target_id)
+        db.set_supervisor_permission(target_id, feature_id, feature_id not in current_perms)
+
+    features = db.get_features()
+    user_perms = db.get_supervisor_permissions(target_id)
+    
+    keyboard = []
+    for f in features:
+        status = "✅" if f['id'] in user_perms else "❌"
+        keyboard.append([InlineKeyboardButton(text=f"{status} {f['name_ar']}", callback_data=f"manager:perms:{target_id}:{f['id']}")])
+    
+    keyboard.append([InlineKeyboardButton(text="⬅️ رجوع", callback_data=f"manager:view:{target_id}")])
+    
+    await callback.message.edit_text(
+        f"⚙️ **تعديل صلاحيات المشرف: {target_id}**\nاضغط على الصلاحية للتفعيل أو التعطيل:",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=keyboard),
+        parse_mode="Markdown"
+    )
+
+@router.callback_query(F.data.startswith("manager:delete:"))
+async def delete_manager_handler(callback: CallbackQuery):
+    if not is_super_admin_user(callback.from_user.id):
+        await callback.answer("للأدمن الأساسي فقط", show_alert=True)
+        return
+    
+    target_id = int(callback.data.split(":")[-1])
+    db.delete_supervisor(target_id)
+    await callback.answer("✅ تم حذف المشرف نهائياً")
+    await list_managers_view(callback)
+
+def manager_control_keyboard_markup(telegram_id: int, is_active: int, is_super: bool):
     buttons = []
     if is_active:
-        buttons.append(InlineKeyboardButton(text="⛔ تعطيل", callback_data=f"manager:disable:{telegram_id}"))
+        buttons.append([InlineKeyboardButton(text="⛔ تعطيل المؤقت", callback_data=f"manager:disable:{telegram_id}")])
     else:
-        buttons.append(InlineKeyboardButton(text="✅ تفعيل", callback_data=f"manager:enable:{telegram_id}"))
-    return InlineKeyboardMarkup(inline_keyboard=[buttons, [InlineKeyboardButton(text="⬅️ رجوع", callback_data="manager:list")]])
+        buttons.append([InlineKeyboardButton(text="✅ تفعيل", callback_data=f"manager:enable:{telegram_id}")])
+    
+    if is_super:
+        buttons.append([InlineKeyboardButton(text="⚙️ تعديل الصلاحيات", callback_data=f"manager:perms:{telegram_id}")])
+        buttons.append([InlineKeyboardButton(text="🗑️ حذف نهائي", callback_data=f"manager:delete:{telegram_id}")])
+        
+    buttons.append([InlineKeyboardButton(text="⬅️ رجوع", callback_data="manager:list")])
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 @router.callback_query(F.data.startswith("manager:view:"))
 async def manager_view_handler(callback: CallbackQuery):
     telegram_id = int(callback.data.split(":")[-1])
     user = db.get_user_by_telegram_id(telegram_id)
+    is_super = is_super_admin_user(callback.from_user.id)
     await callback.message.edit_text(
-        f"👤 المشرف: {telegram_id}\nالحالة: {'مفعل' if user['is_active'] else 'معطل'}",
-        reply_markup=manager_control_keyboard_markup(telegram_id, user["is_active"])
+        f"👤 المشرف: {telegram_id}\nالحالة: {'مفعل' if user['is_active'] else 'معطل'}\nالرتبة: {user['role']}",
+        reply_markup=manager_control_keyboard_markup(telegram_id, user["is_active"], is_super)
     )
 
 @router.callback_query(F.data.startswith("manager:disable:"))
