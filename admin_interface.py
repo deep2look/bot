@@ -56,20 +56,19 @@ async def admin_panel_view(callback: CallbackQuery, state: FSMContext):
         await callback.answer("غير مصرح", show_alert=True)
         return
 
-    # Check if message is accessible
-    if callback.message:
-        try:
-            await callback.message.edit_text(
-                "🔧 لوحة التحكم",
-                reply_markup=admin_main_keyboard_markup()
-            )
-        except Exception:
-            await callback.message.answer(
-                "🔧 لوحة التحكم",
-                reply_markup=admin_main_keyboard_markup()
-            )
-    else:
-        await callback.answer("حدث خطأ في الوصول للرسالة")
+    # Clear current message and show fresh panel to ensure all buttons are loaded
+    try:
+        await callback.message.edit_text(
+            "🔧 لوحة التحكم",
+            reply_markup=admin_main_keyboard_markup()
+        )
+    except Exception:
+        # In case edit fails (e.g. message text is same), try sending fresh message
+        await callback.message.answer(
+            "🔧 لوحة التحكم",
+            reply_markup=admin_main_keyboard_markup()
+        )
+    await callback.answer()
 
 @router.callback_query(F.data == "admin:close")
 async def close_admin_panel(callback: CallbackQuery):
