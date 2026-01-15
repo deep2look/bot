@@ -12,6 +12,7 @@ def main_menu_keyboard(is_admin=False):
     db = Database()
     keyboard = []
     
+    # Only show admin panel button if the user is an admin
     if is_admin:
         keyboard.append([KeyboardButton(text="🔧 لوحة التحكم")])
     
@@ -26,13 +27,13 @@ def main_menu_keyboard(is_admin=False):
     if temp_row:
         keyboard.append(temp_row)
     
-    # Default static buttons
-    keyboard.append([KeyboardButton(text="ℹ️ معلومات"), KeyboardButton(text="🆘 الدعم")])
+    # Static buttons (optional, can be removed if user wants only their buttons)
+    # keyboard.append([KeyboardButton(text="ℹ️ معلومات"), KeyboardButton(text="🆘 الدعم")])
     
     return ReplyKeyboardMarkup(
         keyboard=keyboard,
         resize_keyboard=True,
-        input_field_placeholder="اختر من القائمة..."
+        input_field_placeholder="مرحباً بك في البوت..."
     )
 
 
