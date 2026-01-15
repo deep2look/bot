@@ -23,7 +23,7 @@ def main_menu_keyboard(is_admin=False):
     temp_row = []
     for btn in dynamic_buttons:
         temp_row.append(KeyboardButton(text=btn['text']))
-        if len(row) == 2:  # 2 buttons per row
+        if len(temp_row) == 2:  # 2 buttons per row
             keyboard.append(temp_row)
             temp_row = []
     if temp_row:
