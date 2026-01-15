@@ -1,9 +1,8 @@
 # admin_interface.py
 
-from aiogram import Router, F
+from aiogram import Router, F, Bot
 from aiogram.types import CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton, Message
 from aiogram.fsm.context import FSMContext
-from aiogram import Bot
 
 from database import Database
 from states import AddSupervisor, ManageButtons
@@ -14,24 +13,25 @@ db = Database()
 # ======================
 # Permissions
 # ======================
-def is_admin(telegram_id: int) -> bool:
+def is_admin_user(telegram_id: int) -> bool:
     user = db.get_user_by_telegram_id(telegram_id)
     return bool(user and user["role"] in ("super_admin", "admin", "supervisor"))
 
-def is_super_admin(telegram_id: int) -> bool:
+def is_super_admin_user(telegram_id: int) -> bool:
     user = db.get_user_by_telegram_id(telegram_id)
     return bool(user and user["role"] == "super_admin")
 
 # ======================
 # Keyboards
 # ======================
-def admin_main_keyboard():
+def admin_main_keyboard_markup():
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="👥 إدارة المشرفين", callback_data="admin:managers")],
         [InlineKeyboardButton(text="🧱 إدارة الأزرار", callback_data="admin:buttons_list")],
+        [InlineKeyboardButton(text="📊 الإحصائيات", callback_data="admin:stats")],
     ])
 
-def managers_keyboard():
+def managers_keyboard_markup():
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="➕ إضافة مشرف", callback_data="manager:add")],
         [InlineKeyboardButton(text="📋 عرض المشرفين", callback_data="manager:list")],
@@ -43,29 +43,30 @@ def managers_keyboard():
 # ======================
 @router.callback_query(F.data == "admin:panel")
 @router.callback_query(F.data == "admin:back")
-async def admin_panel(callback: CallbackQuery):
-    if not is_admin(callback.from_user.id):
+async def admin_panel_view(callback: CallbackQuery):
+    if not is_admin_user(callback.from_user.id):
         await callback.answer("غير مصرح", show_alert=True)
         return
 
     await callback.message.edit_text(
         "🔧 لوحة التحكم",
-        reply_markup=admin_main_keyboard()
+        reply_markup=admin_main_keyboard_markup()
     )
-
 
 @router.callback_query(F.data == "admin:managers")
 @router.callback_query(F.data == "admin:supervisors")
-async def managers_menu(callback: CallbackQuery):
+async def managers_menu_view(callback: CallbackQuery):
     await callback.message.edit_text(
         "👥 إدارة المشرفين",
-        reply_markup=managers_keyboard()
+        reply_markup=managers_keyboard_markup()
     )
 
-
+# ======================
+# Buttons Management
+# ======================
 @router.callback_query(F.data == "admin:buttons")
 @router.callback_query(F.data == "admin:buttons_list")
-async def list_buttons_admin(callback: CallbackQuery):
+async def list_buttons_admin_view(callback: CallbackQuery):
     buttons = db.get_buttons()
     keyboard = []
     for btn in buttons:
@@ -82,23 +83,20 @@ async def list_buttons_admin(callback: CallbackQuery):
         reply_markup=InlineKeyboardMarkup(inline_keyboard=keyboard)
     )
 
-
 @router.callback_query(F.data == "admin:stats")
-async def stats_handler(callback: CallbackQuery):
-    # Basic stats as a placeholder
-    users_count = 0  # Should be implemented in database.py
+async def stats_handler_view(callback: CallbackQuery):
     await callback.message.edit_text(
         "📊 إحصائيات البوت:\n\nقريباً سيتم عرض إحصائيات مفصلة هنا.",
-        reply_markup=admin_main_keyboard()
+        reply_markup=admin_main_keyboard_markup()
     )
 
 @router.callback_query(F.data == "button:add")
-async def add_button_start(callback: CallbackQuery, state: FSMContext):
+async def add_button_start_handler(callback: CallbackQuery, state: FSMContext):
     await state.set_state(ManageButtons.waiting_for_text)
     await callback.message.edit_text("أرسل نص الزر الذي سيظهر للمستخدمين:")
 
 @router.message(ManageButtons.waiting_for_text)
-async def add_button_text(message: Message, state: FSMContext):
+async def add_button_text_handler(message: Message, state: FSMContext):
     await state.update_data(text=message.text)
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="نص (رسالة)", callback_data="type:text")],
@@ -109,7 +107,7 @@ async def add_button_text(message: Message, state: FSMContext):
     await message.answer("اختر نوع الزر:", reply_markup=keyboard)
 
 @router.callback_query(ManageButtons.waiting_for_type)
-async def add_button_type(callback: CallbackQuery, state: FSMContext):
+async def add_button_type_handler(callback: CallbackQuery, state: FSMContext):
     btn_type = callback.data.split(":")[-1]
     await state.update_data(type=btn_type)
     await state.set_state(ManageButtons.waiting_for_content)
@@ -122,7 +120,7 @@ async def add_button_type(callback: CallbackQuery, state: FSMContext):
         await callback.message.edit_text("أرسل المعرف أو رقم الهاتف للتواصل:")
 
 @router.message(ManageButtons.waiting_for_content)
-async def add_button_finish(message: Message, state: FSMContext):
+async def add_button_finish_handler(message: Message, state: FSMContext):
     data = await state.get_data()
     db.add_button(
         text=data['text'],
@@ -131,27 +129,27 @@ async def add_button_finish(message: Message, state: FSMContext):
         created_by=message.from_user.id
     )
     await state.clear()
-    await message.answer("✅ تم إضافة الزر بنجاح!", reply_markup=admin_main_keyboard())
+    await message.answer("✅ تم إضافة الزر بنجاح!", reply_markup=admin_main_keyboard_markup())
 
 @router.callback_query(F.data.startswith("btn_del:"))
-async def delete_button_handler(callback: CallbackQuery):
+async def delete_button_handler_view(callback: CallbackQuery):
     btn_id = int(callback.data.split(":")[-1])
     db.delete_button(btn_id)
     await callback.answer("✅ تم حذف الزر")
-    await list_buttons_admin(callback)
+    await list_buttons_admin_view(callback)
 
 # ======================
 # Add Supervisor Handlers
 # ======================
 @router.callback_query(F.data == "manager:add")
-async def add_manager_start(callback: CallbackQuery, state: FSMContext):
+async def add_manager_start_view(callback: CallbackQuery, state: FSMContext):
     await state.set_state(AddSupervisor.waiting_for_username)
     await callback.message.edit_text(
         "📥 أرسل معرف المشرف (بدون @)\nمثال: username"
     )
 
 @router.message(AddSupervisor.waiting_for_username)
-async def add_manager_finish(message: Message, state: FSMContext, bot: Bot):
+async def add_manager_finish_view(message: Message, state: FSMContext, bot: Bot):
     username = message.text.strip().lstrip("@")
     if not username.isalnum():
         await message.answer("❌ معرف غير صالح")
@@ -166,16 +164,16 @@ async def add_manager_finish(message: Message, state: FSMContext, bot: Bot):
     await state.clear()
     await message.answer(
         f"✅ تم إضافة المشرف @{username} بنجاح",
-        reply_markup=admin_main_keyboard()
+        reply_markup=admin_main_keyboard_markup()
     )
 
 @router.callback_query(F.data == "manager:list")
-async def list_managers(callback: CallbackQuery):
+async def list_managers_view(callback: CallbackQuery):
     admins = db.get_admins()
     if not admins:
         await callback.message.edit_text(
             "لا يوجد مشرفون حاليًا",
-            reply_markup=managers_keyboard()
+            reply_markup=managers_keyboard_markup()
         )
         return
     keyboard = []
@@ -194,7 +192,7 @@ async def list_managers(callback: CallbackQuery):
         reply_markup=InlineKeyboardMarkup(inline_keyboard=keyboard)
     )
 
-def manager_control_keyboard(telegram_id: int, is_active: int):
+def manager_control_keyboard_markup(telegram_id: int, is_active: int):
     buttons = []
     if is_active:
         buttons.append(InlineKeyboardButton(text="⛔ تعطيل", callback_data=f"manager:disable:{telegram_id}"))
@@ -203,24 +201,24 @@ def manager_control_keyboard(telegram_id: int, is_active: int):
     return InlineKeyboardMarkup(inline_keyboard=[buttons, [InlineKeyboardButton(text="⬅️ رجوع", callback_data="manager:list")]])
 
 @router.callback_query(F.data.startswith("manager:view:"))
-async def manager_view(callback: CallbackQuery):
+async def manager_view_handler(callback: CallbackQuery):
     telegram_id = int(callback.data.split(":")[-1])
     user = db.get_user_by_telegram_id(telegram_id)
     await callback.message.edit_text(
         f"👤 المشرف: {telegram_id}\nالحالة: {'مفعل' if user['is_active'] else 'معطل'}",
-        reply_markup=manager_control_keyboard(telegram_id, user["is_active"])
+        reply_markup=manager_control_keyboard_markup(telegram_id, user["is_active"])
     )
 
 @router.callback_query(F.data.startswith("manager:disable:"))
-async def disable_manager(callback: CallbackQuery):
+async def disable_manager_handler(callback: CallbackQuery):
     telegram_id = int(callback.data.split(":")[-1])
     db.set_user_active(telegram_id, 0)
     await callback.answer("تم التعطيل")
-    await manager_view(callback)
+    await manager_view_handler(callback)
 
 @router.callback_query(F.data.startswith("manager:enable:"))
-async def enable_manager(callback: CallbackQuery):
+async def enable_manager_handler(callback: CallbackQuery):
     telegram_id = int(callback.data.split(":")[-1])
     db.set_user_active(telegram_id, 1)
     await callback.answer("تم التفعيل")
-    await manager_view(callback)
+    await manager_view_handler(callback)
