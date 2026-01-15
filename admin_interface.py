@@ -29,6 +29,7 @@ def admin_main_keyboard_markup():
         [InlineKeyboardButton(text="👥 إدارة المشرفين", callback_data="admin:managers")],
         [InlineKeyboardButton(text="🧱 إدارة الأزرار", callback_data="admin:buttons_list")],
         [InlineKeyboardButton(text="📊 الإحصائيات", callback_data="admin:stats")],
+        [InlineKeyboardButton(text="📜 سجل المراسلات", callback_data="admin:logs")],
         [InlineKeyboardButton(text="⬅️ إغلاق", callback_data="admin:close")]
     ])
 
@@ -396,8 +397,11 @@ async def disable_manager_handler(callback: CallbackQuery):
 # ======================
 @router.callback_query(F.data.startswith("support:reply:"))
 async def support_reply_start(callback: CallbackQuery, state: FSMContext):
-    user_id = int(callback.data.split(":")[-1])
-    await state.update_data(reply_to_user_id=user_id)
+    parts = callback.data.split(":")
+    user_id = int(parts[2])
+    button_id = int(parts[3]) if len(parts) > 3 else None
+    
+    await state.update_data(reply_to_user_id=user_id, reply_button_id=button_id)
     await state.set_state(SupportState.waiting_for_reply)
     await callback.message.answer(f"أرسل ردك للمستخدم ({user_id}):", reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="إلغاء", callback_data="admin:panel")]]))
     await callback.answer()
@@ -406,12 +410,57 @@ async def support_reply_start(callback: CallbackQuery, state: FSMContext):
 async def support_reply_process(message: Message, state: FSMContext, bot: Bot):
     data = await state.get_data()
     user_id = data.get("reply_to_user_id")
+    button_id = data.get("reply_button_id")
+    admin_name = message.from_user.full_name
     
     try:
         await bot.send_message(user_id, f"✉️ **رد من الإدارة:**\n\n{message.text}", parse_mode="Markdown")
-        db.add_support_message(user_id, message.text, is_from_admin=1, admin_id=message.from_user.id)
+        db.add_support_message(user_id, message.text, is_from_admin=1, admin_id=message.from_user.id, button_id=button_id, admin_name=admin_name)
         await message.answer("✅ تم إرسال الرد بنجاح.")
     except Exception as e:
         await message.answer(f"❌ فشل إرسال الرد: {e}")
     
     await state.clear()
+
+# ======================
+# Logs Handlers
+# ======================
+@router.callback_query(F.data == "admin:logs")
+async def show_logs_categories(callback: CallbackQuery):
+    contact_buttons = db.get_contact_buttons()
+    if not contact_buttons:
+        await callback.message.edit_text("❌ لا توجد أزرار تواصل مبرمجة حالياً.", reply_markup=back_to_admin_button())
+        return
+
+    keyboard = []
+    for btn in contact_buttons:
+        keyboard.append([InlineKeyboardButton(text=f"📂 {btn['text']}", callback_data=f"logs:view:{btn['id']}")])
+    
+    keyboard.append([InlineKeyboardButton(text="⬅️ رجوع", callback_data="admin:panel")])
+    
+    await callback.message.edit_text("📜 اختر القسم لعرض سجل المراسلات:", reply_markup=InlineKeyboardMarkup(inline_keyboard=keyboard))
+
+@router.callback_query(F.data.startswith("logs:view:"))
+async def view_logs_by_button(callback: CallbackQuery):
+    button_id = int(callback.data.split(":")[-1])
+    btn = db.get_button_by_id(button_id)
+    messages = db.get_messages_by_button(button_id)
+    
+    if not messages:
+        await callback.message.edit_text(f"📜 سجل {btn['text']} فارغ حالياً.", reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="⬅️ رجوع", callback_data="admin:logs")]]))
+        return
+
+    # Process messages to group by user or just show chronologically
+    logs_text = f"📜 **سجل مراسلات قسم: {btn['text']}**\n━━━━━━━━━━━━━━━\n\n"
+    
+    # We'll show the last 10-15 messages to avoid character limit, with basic info
+    for msg in messages[-15:]:
+        sender_type = "👤 مستخدم" if not msg['is_from_admin'] else f"👮 مشرف ({msg['admin_name'] or 'غير معروف'})"
+        sender_info = f"{msg['full_name']} ({msg['user_id']})" if not msg['is_from_admin'] else sender_type
+        
+        logs_text += f"📅 `{msg['timestamp']}`\n"
+        logs_text += f"**{sender_info}:**\n"
+        logs_text += f"{msg['message_text']}\n"
+        logs_text += "────────────────\n"
+
+    await callback.message.edit_text(logs_text, reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="⬅️ رجوع", callback_data="admin:logs")]]), parse_mode="Markdown")

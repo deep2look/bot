@@ -60,8 +60,11 @@ async def user_submit_support(message: Message, state: FSMContext, bot: Bot):
         await state.clear()
         return
 
+    data = await state.get_data()
+    button_id = data.get("contact_button_id")
+
     # Save to DB
-    db.add_support_message(message.from_user.id, message.text)
+    db.add_support_message(message.from_user.id, message.text, button_id=button_id)
     
     # Notify Admins
     admins = db.get_admins()
@@ -74,11 +77,11 @@ async def user_submit_support(message: Message, state: FSMContext, bot: Bot):
     for admin_id in admin_ids:
         try:
             kb = InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text="💬 رد على المستخدم", callback_data=f"support:reply:{message.from_user.id}")]
+                [InlineKeyboardButton(text="💬 رد على المستخدم", callback_data=f"support:reply:{message.from_user.id}:{button_id}")]
             ])
             await bot.send_message(
                 admin_id, 
-                f"📥 **رسالة دعم جديدة**\nمن: {message.from_user.full_name} ({message.from_user.id})\n\nالرسالة:\n{message.text}",
+                f"📥 **رسالة دعم جديدة**\nمن: {message.from_user.full_name} ({message.from_user.id})\nالقسم: {data.get('contact_button_text', 'غير محدد')}\n\nالرسالة:\n{message.text}",
                 reply_markup=kb,
                 parse_mode="Markdown"
             )
@@ -131,6 +134,7 @@ async def dynamic_button_handler(message: Message, state: FSMContext):
         await message.answer(f"إليك الرابط الخاص بـ {target_btn['text']}:", reply_markup=keyboard)
     elif target_btn['type'] == 'contact':
         await state.set_state(SupportState.waiting_for_message)
+        await state.update_data(contact_button_id=target_btn['id'], contact_button_text=target_btn['text'])
         await message.answer(
             f"🚀 أنت الآن في وضع التواصل المباشر مع الإدارة بخصوص: {target_btn['text']}\n\nأرسل رسالتك الآن وسيقوم أحد المشرفين بالرد عليك هنا.",
             reply_markup=ReplyKeyboardMarkup(keyboard=[[KeyboardButton(text="🏠 القائمة الرئيسية")]], resize_keyboard=True)

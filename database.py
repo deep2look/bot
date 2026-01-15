@@ -223,9 +223,23 @@ class Database:
     # ======================
     # Support Messages
     # ======================
-    def add_support_message(self, user_id, message_text, is_from_admin=0, admin_id=None):
+    def add_support_message(self, user_id, message_text, is_from_admin=0, admin_id=None, button_id=None, admin_name=None):
         self.cursor.execute("""
-            INSERT INTO support_messages (user_id, message_text, is_from_admin, admin_id)
-            VALUES (?, ?, ?, ?)
-        """, (user_id, message_text, is_from_admin, admin_id))
+            INSERT INTO support_messages (user_id, message_text, is_from_admin, admin_id, button_id, admin_name)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (user_id, message_text, is_from_admin, admin_id, button_id, admin_name))
         self.conn.commit()
+
+    def get_messages_by_button(self, button_id):
+        self.cursor.execute("""
+            SELECT sm.*, u.username, u.full_name 
+            FROM support_messages sm 
+            LEFT JOIN users u ON sm.user_id = u.telegram_id 
+            WHERE sm.button_id = ? 
+            ORDER BY sm.timestamp ASC
+        """, (button_id,))
+        return self.cursor.fetchall()
+
+    def get_contact_buttons(self):
+        self.cursor.execute("SELECT * FROM buttons WHERE type = 'contact'")
+        return self.cursor.fetchall()
