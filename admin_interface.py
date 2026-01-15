@@ -143,9 +143,19 @@ async def move_button_handler(callback: CallbackQuery):
 
 @router.callback_query(F.data == "admin:stats")
 async def stats_handler_view(callback: CallbackQuery):
+    total_users = db.get_total_users_count()
+    
+    stats_text = (
+        "📊 **إحصائيات البوت الحية**\n\n"
+        f"👥 إجمالي المستخدمين: `{total_users}`\n"
+        "━━━━━━━━━━━━━━━\n"
+        "💡 هذه الإحصائيات محدثة بشكل حي من قاعدة البيانات."
+    )
+    
     await callback.message.edit_text(
-        "📊 إحصائيات البوت:\n\nقريباً سيتم عرض إحصائيات مفصلة هنا.",
-        reply_markup=back_to_admin_button()
+        stats_text,
+        reply_markup=back_to_admin_button(),
+        parse_mode="Markdown"
     )
 
 @router.callback_query(F.data.startswith("button:add"))

@@ -20,8 +20,11 @@ class Database:
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY,
             telegram_id INTEGER UNIQUE,
+            username TEXT,
+            full_name TEXT,
             role TEXT DEFAULT 'user',
-            is_active INTEGER DEFAULT 1
+            is_active INTEGER DEFAULT 1,
+            joined_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )
         """)
 
@@ -101,12 +104,23 @@ class Database:
     # ======================
     # Users
     # ======================
-    def add_user(self, telegram_id, role="user"):
+    def add_user(self, telegram_id, username=None, full_name=None, role="user"):
         self.cursor.execute(
-            "INSERT OR IGNORE INTO users (telegram_id, role) VALUES (?, ?)",
-            (telegram_id, role)
+            "INSERT OR IGNORE INTO users (telegram_id, username, full_name, role) VALUES (?, ?, ?, ?)",
+            (telegram_id, username, full_name, role)
         )
         self.conn.commit()
+
+    def update_user_info(self, telegram_id, username, full_name):
+        self.cursor.execute(
+            "UPDATE users SET username = ?, full_name = ? WHERE telegram_id = ?",
+            (username, full_name, telegram_id)
+        )
+        self.conn.commit()
+
+    def get_total_users_count(self):
+        self.cursor.execute("SELECT COUNT(*) FROM users")
+        return self.cursor.fetchone()[0]
 
     def get_user_by_telegram_id(self, telegram_id):
         self.cursor.execute(

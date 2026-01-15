@@ -51,14 +51,44 @@ async def main():
     @dp.message(CommandStart())
     async def start_handler(message: Message):
         telegram_id = message.from_user.id
-        db.add_user(telegram_id=telegram_id)
+        user = db.get_user_by_telegram_id(telegram_id)
+        
+        if not user:
+            # First time user - show Start button
+            kb = InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="ابدأ - Start", callback_data="user:start_registration")]
+            ])
+            await message.answer(
+                f"👋 مرحبًا بك {message.from_user.full_name}\n"
+                "اضغط على الزر أدناه للبدء واستخدام خدمات البوت.",
+                reply_markup=kb
+            )
+        else:
+            is_admin = user["role"] in ("super_admin", "admin", "supervisor")
+            await message.answer(
+                f"👋 مرحبًا بك مجدداً {message.from_user.full_name}\n"
+                "المحتوى سيظهر هنا عند تفعيله من الإدارة.",
+                reply_markup=main_menu_keyboard(is_admin=is_admin)
+            )
+
+    @dp.callback_query(F.data == "user:start_registration")
+    async def process_registration(callback: CallbackQuery):
+        telegram_id = callback.from_user.id
+        username = callback.from_user.username
+        full_name = callback.from_user.full_name
+        
+        db.add_user(telegram_id=telegram_id, username=username, full_name=full_name)
+        db.update_user_info(telegram_id, username, full_name) # Ensure info is up to date
+        
         user = db.get_user_by_telegram_id(telegram_id)
         is_admin = user["role"] in ("super_admin", "admin", "supervisor")
-        await message.answer(
-            f"👋 مرحبًا بك {message.from_user.full_name}\n"
-            "المحتوى سيظهر هنا عند تفعيله من الإدارة.",
+        
+        await callback.message.delete()
+        await callback.message.answer(
+            "✅ تم تسجيلك بنجاح! أهلاً بك في خدمات البوت.",
             reply_markup=main_menu_keyboard(is_admin=is_admin)
         )
+        await callback.answer()
 
     @dp.message(lambda message: message.text == "🔄 تحديث البوت")
     async def refresh_bot_handler(message: Message):
