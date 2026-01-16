@@ -143,8 +143,35 @@ async def move_button_handler(callback: CallbackQuery):
         await callback.answer("تم تغيير الترتيب")
         btn = db.get_button_by_id(btn_id)
         parent_id = btn['parent_id'] if btn else None
-        callback.data = f"admin:buttons_list:{parent_id}" if parent_id else "admin:buttons_list"
-        await list_buttons_admin_view(callback)
+        
+        # Fresh view instead of modifying frozen callback.data
+        buttons = db.get_buttons(parent_id)
+        keyboard = []
+        
+        parent_text = ""
+        if parent_id:
+            parent_btn = db.get_button_by_id(parent_id)
+            if parent_btn:
+                parent_text = f" (داخل: {parent_btn['text']})"
+                back_id = parent_btn['parent_id']
+                keyboard.append([InlineKeyboardButton(text="⬅️ مستوى للأعلى", callback_data=f"admin:buttons_list:{back_id}" if back_id else "admin:buttons_list")])
+
+        for btn_item in buttons:
+            keyboard.append([
+                InlineKeyboardButton(text=f"📝 {btn_item['text']}", callback_data=f"btn_edit:{btn_item['id']}"),
+                InlineKeyboardButton(text="🔼", callback_data=f"btn_move:up:{btn_item['id']}"),
+                InlineKeyboardButton(text="🔽", callback_data=f"btn_move:down:{btn_item['id']}"),
+                InlineKeyboardButton(text="❌", callback_data=f"btn_del:{btn_item['id']}")
+            ])
+        
+        keyboard.append([InlineKeyboardButton(text="➕ إضافة زر هنا", callback_data=f"button:add:{parent_id}" if parent_id else "button:add")])
+        if not parent_id:
+            keyboard.append([InlineKeyboardButton(text="⬅️ القائمة الرئيسية", callback_data="admin:panel")])
+        
+        await callback.message.edit_text(
+            f"🧱 إدارة الأزرار{parent_text}:\n\n🔼/🔽: للترتيب.\n📝: للتعديل والدخول للأزرار الفرعية.\n❌: للحذف.",
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=keyboard)
+        )
     else:
         await callback.answer("لا يمكن التحريك أكثر من ذلك", show_alert=False)
 
