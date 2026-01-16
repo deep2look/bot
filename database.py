@@ -276,3 +276,7 @@ class Database:
     def get_admin_logs(self, limit=20):
         self.cursor.execute("SELECT * FROM admin_logs ORDER BY timestamp DESC LIMIT ?", (limit,))
         return self.cursor.fetchall()
+
+    def get_contact_buttons(self):
+        self.cursor.execute("SELECT * FROM buttons WHERE type = 'contact' AND is_active = 1")
+        return self.cursor.fetchall()
