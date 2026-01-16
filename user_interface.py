@@ -124,18 +124,13 @@ async def dynamic_button_handler(message: Message, state: FSMContext):
         return
 
     # Normal button actions
-    if target_btn['type'] == 'text':
-        await message.answer(target_btn['content'])
-    elif target_btn['type'] == 'url':
-        url = target_btn['content'].strip()
-        keyboard = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="🔗 فتح الرابط", url=url)]
-        ])
-        await message.answer(f"إليك الرابط الخاص بـ {target_btn['text']}:", reply_markup=keyboard)
-    elif target_btn['type'] == 'contact':
+    if target_btn['type'] == 'contact':
         await state.set_state(SupportState.waiting_for_message)
         await state.update_data(contact_button_id=target_btn['id'], contact_button_text=target_btn['text'])
         await message.answer(
             f"🚀 أنت الآن في وضع التواصل المباشر مع الإدارة بخصوص: {target_btn['text']}\n\nأرسل رسالتك الآن وسيقوم أحد المشرفين بالرد عليك هنا.",
             reply_markup=ReplyKeyboardMarkup(keyboard=[[KeyboardButton(text="🏠 القائمة الرئيسية")]], resize_keyboard=True)
         )
+    else:
+        # For 'content', 'text', 'url', etc. - just send the content
+        await message.answer(target_btn['content'])

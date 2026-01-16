@@ -183,10 +183,8 @@ async def add_button_start_handler(callback: CallbackQuery, state: FSMContext):
 async def add_button_text_handler(message: Message, state: FSMContext):
     await state.update_data(text=message.text)
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="نص (رسالة)", callback_data="type:text")],
-        [InlineKeyboardButton(text="رابط (URL)", callback_data="type:url")],
-        [InlineKeyboardButton(text="تواصل (Contact)", callback_data="type:contact")],
-        [InlineKeyboardButton(text="📁 زر أب (مجلد)", callback_data="type:folder")],
+        [InlineKeyboardButton(text="📝 محتوى (نص، روابط، وسائط)", callback_data="type:content")],
+        [InlineKeyboardButton(text="💬 تواصل (Contact)", callback_data="type:contact")],
         [InlineKeyboardButton(text="⬅️ رجوع", callback_data="admin:panel")]
     ])
     await state.set_state(ManageButtons.waiting_for_type)
@@ -207,27 +205,11 @@ async def add_button_type_handler(callback: CallbackQuery, state: FSMContext):
             created_by=callback.from_user.id
         )
         await state.clear()
-        await callback.message.edit_text("✅ تم إضافة زر التواصل بنجاح! سيتمكن المستخدمون الآن من مراسلتكم مباشرة.", reply_markup=admin_main_keyboard_markup())
-        return
-
-    if btn_type == "folder":
-        data = await state.get_data()
-        db.add_button(
-            text=data['text'],
-            btn_type="folder",
-            content="Folder",
-            parent_id=data.get('parent_id'),
-            created_by=callback.from_user.id
-        )
-        await state.clear()
-        await callback.message.edit_text("✅ تم إضافة زر الأب (المجلد) بنجاح! يمكنك الآن الدخول إليه وإضافة أزرار فرعية.", reply_markup=admin_main_keyboard_markup())
+        await callback.message.edit_text("✅ تم إضافة زر التواصل بنجاح!", reply_markup=admin_main_keyboard_markup(callback.from_user.id))
         return
 
     await state.set_state(ManageButtons.waiting_for_content)
-    if btn_type == "text":
-        await callback.message.edit_text("أرسل النص الذي سيقوم البوت بإرساله عند الضغط على الزر:", reply_markup=back_to_admin_button())
-    elif btn_type == "url":
-        await callback.message.edit_text("أرسل الرابط (http://...):", reply_markup=back_to_admin_button())
+    await callback.message.edit_text("أرسل المحتوى الذي سيظهر عند الضغط على الزر (نص أو روابط):", reply_markup=back_to_admin_button())
 
 @router.message(ManageButtons.waiting_for_content)
 async def add_button_finish_handler(message: Message, state: FSMContext):
