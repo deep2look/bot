@@ -66,8 +66,8 @@ async def main():
         else:
             is_admin = user["role"] in ("super_admin", "admin", "supervisor")
             await message.answer(
-                f"👋 مرحبًا بك مجدداً {message.from_user.full_name}\n"
-                "المحتوى سيظهر هنا عند تفعيله من الإدارة.",
+                f"👋 قناة أصحاب السمرة ترحب بكم {message.from_user.full_name}\n"
+                "هذا البوت الخاص بدورة صناعة المحدث.",
                 reply_markup=main_menu_keyboard(is_admin=is_admin)
             )
 

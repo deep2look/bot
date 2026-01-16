@@ -241,7 +241,7 @@ async def add_button_finish_handler(message: Message, state: FSMContext):
     )
     db.add_admin_log(message.from_user.id, message.from_user.full_name, "إضافة زر", "إدارة الأزرار", f"إضافة زر جديد: {data['text']}")
     await state.clear()
-    await message.answer("✅ تم إضافة الزر بنجاح!", reply_markup=admin_main_keyboard_markup())
+    await message.answer("✅ تم إضافة الزر بنجاح!", reply_markup=admin_main_keyboard_markup(message.from_user.id))
 
 @router.callback_query(F.data.startswith("btn_del:"))
 async def delete_button_handler_view(callback: CallbackQuery):
@@ -308,7 +308,7 @@ async def process_new_text(message: Message, state: FSMContext):
     
     db.update_button(btn_id, text=new_text)
     await state.clear()
-    await message.answer(f"✅ تم تغيير اسم الزر إلى: {new_text}", reply_markup=admin_main_keyboard_markup())
+    await message.answer(f"✅ تم تغيير اسم الزر إلى: {new_text}", reply_markup=admin_main_keyboard_markup(message.from_user.id))
 
 @router.message(ManageButtons.waiting_for_new_content)
 async def process_new_content(message: Message, state: FSMContext):
@@ -318,7 +318,7 @@ async def process_new_content(message: Message, state: FSMContext):
     
     db.update_button(btn_id, content=new_content)
     await state.clear()
-    await message.answer("✅ تم تحديث محتوى الزر بنجاح!", reply_markup=admin_main_keyboard_markup())
+    await message.answer("✅ تم تحديث محتوى الزر بنجاح!", reply_markup=admin_main_keyboard_markup(message.from_user.id))
 
 # ======================
 # Add Supervisor Handlers
@@ -347,7 +347,7 @@ async def add_manager_finish_view(message: Message, state: FSMContext, bot: Bot)
     await state.clear()
     await message.answer(
         f"✅ تم إضافة المشرف @{username} بنجاح",
-        reply_markup=admin_main_keyboard_markup()
+        reply_markup=admin_main_keyboard_markup(message.from_user.id)
     )
 
 @router.callback_query(F.data == "manager:list")
