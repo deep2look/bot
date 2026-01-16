@@ -527,6 +527,42 @@ async def show_logs_categories(callback: CallbackQuery):
     
     await callback.message.edit_text("📜 اختر القسم لعرض سجل المراسلات:", reply_markup=InlineKeyboardMarkup(inline_keyboard=keyboard))
 
+@router.callback_query(F.data.startswith("logs:view:"))
+async def view_section_logs(callback: CallbackQuery):
+    parts = callback.data.split(":")
+    button_id = int(parts[2])
+    
+    messages = db.get_messages_by_button(button_id)
+    btn = db.get_button_by_id(button_id)
+    
+    if not messages:
+        await callback.message.edit_text(
+            f"📜 سجل المراسلات لـ {btn['text'] if btn else 'غير معروف'}:\n\nلا توجد رسائل في هذا القسم حالياً.",
+            reply_markup=back_to_admin_button()
+        )
+        return
+
+    logs_text = f"📜 **سجل المراسلات: {btn['text']}**\n\n"
+    for msg in messages:
+        sender = "👤 المستخدم" if not msg['is_from_admin'] else "🛠️ الإدارة"
+        logs_text += f"{sender}: {msg['message_text']}\n"
+        logs_text += f"📅 {msg['timestamp']}\n"
+        logs_text += "────────────────\n"
+    
+    # Add reply button for the last user if the last message was from a user
+    last_msg = messages[-1]
+    keyboard = []
+    if not last_msg['is_from_admin']:
+        keyboard.append([InlineKeyboardButton(text="💬 رد على آخر رسالة", callback_data=f"support:reply:{last_msg['user_id']}:{button_id}")])
+    
+    keyboard.append([InlineKeyboardButton(text="⬅️ رجوع", callback_data="admin:logs")])
+    
+    # Limit message length
+    if len(logs_text) > 4000:
+        logs_text = logs_text[-4000:]
+        
+    await callback.message.edit_text(logs_text, reply_markup=InlineKeyboardMarkup(inline_keyboard=keyboard), parse_mode="Markdown")
+
 @router.callback_query(F.data == "admin:admin_logs")
 async def show_admin_logs(callback: CallbackQuery):
     if not is_super_admin_user(callback.from_user.id):
