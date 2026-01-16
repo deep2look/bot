@@ -15,3 +15,6 @@ class SupportState(StatesGroup):
     waiting_for_message = State()
     waiting_for_reply = State()
 
+class BroadcastState(StatesGroup):
+    waiting_for_message = State()
+

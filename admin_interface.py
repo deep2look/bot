@@ -36,6 +36,7 @@ def admin_main_keyboard_markup(user_id):
     if is_super or db.has_permission(user_id, 'logs'):
         buttons.append([InlineKeyboardButton(text="📜 سجل المراسلات", callback_data="admin:logs")])
     if is_super:
+        buttons.append([InlineKeyboardButton(text="📢 إذاعة رسالة للكل", callback_data="admin:broadcast")])
         buttons.append([InlineKeyboardButton(text="🛡️ سجل المشرفين", callback_data="admin:admin_logs")])
     buttons.append([InlineKeyboardButton(text="⬅️ إغلاق", callback_data="admin:close")])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
@@ -547,3 +548,60 @@ async def show_admin_logs(callback: CallbackQuery):
         logs_text += "────────────────\n"
 
     await callback.message.edit_text(logs_text, reply_markup=back_to_admin_button(), parse_mode="Markdown")
+
+# ======================
+# Broadcast Handlers
+# ======================
+@router.callback_query(F.data == "admin:broadcast")
+async def broadcast_start_handler(callback: CallbackQuery, state: FSMContext):
+    if not is_super_admin_user(callback.from_user.id):
+        await callback.answer("للأدمن الأساسي فقط", show_alert=True)
+        return
+    
+    from states import BroadcastState
+    await state.set_state(BroadcastState.waiting_for_message)
+    await callback.message.edit_text(
+        "📢 **قسم الإذاعة العامة**\n\nأرسل الرسالة التي تريد توجيهها لجميع مستخدمي البوت:",
+        reply_markup=back_to_admin_button(),
+        parse_mode="Markdown"
+    )
+
+@router.message(F.text, F.state == "BroadcastState:waiting_for_message")
+async def broadcast_process_handler(message: Message, state: FSMContext, bot: Bot):
+    from states import BroadcastState
+    current_state = await state.get_state()
+    if current_state != BroadcastState.waiting_for_message.state:
+        return
+
+    broadcast_text = message.text
+    await state.clear()
+    
+    # Get all users from DB
+    db.cursor.execute("SELECT telegram_id FROM users WHERE role = 'user'")
+    users = db.cursor.fetchall()
+    
+    if not users:
+        await message.answer("❌ لا يوجد مستخدمون لإرسال الرسالة إليهم.")
+        return
+
+    status_msg = await message.answer(f"⏳ جاري بدء الإذاعة لـ {len(users)} مستخدم...")
+    
+    success_count = 0
+    fail_count = 0
+    
+    for user in users:
+        try:
+            await bot.send_message(user['telegram_id'], f"📢 **إعلان من الإدارة:**\n\n{broadcast_text}", parse_mode="Markdown")
+            success_count += 1
+        except Exception:
+            fail_count += 1
+            
+    db.add_admin_log(message.from_user.id, message.from_user.full_name, "إذاعة عامة", "النظام", f"تم الإرسال لـ {success_count} مستخدم (فشل {fail_count})")
+    
+    await status_msg.edit_text(
+        f"✅ **اكتملت عملية الإذاعة**\n\n"
+        f"🔹 تم الإرسال بنجاح: `{success_count}`\n"
+        f"🔸 فشل الإرسال (بوت محظور): `{fail_count}`",
+        reply_markup=admin_main_keyboard_markup(message.from_user.id),
+        parse_mode="Markdown"
+    )
