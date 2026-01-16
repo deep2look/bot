@@ -184,6 +184,7 @@ async def add_button_text_handler(message: Message, state: FSMContext):
     await state.update_data(text=message.text)
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="📝 محتوى (نص، روابط، وسائط)", callback_data="type:content")],
+        [InlineKeyboardButton(text="📁 زر أب (مجلد)", callback_data="type:folder")],
         [InlineKeyboardButton(text="💬 تواصل (Contact)", callback_data="type:contact")],
         [InlineKeyboardButton(text="⬅️ رجوع", callback_data="admin:panel")]
     ])
@@ -206,6 +207,19 @@ async def add_button_type_handler(callback: CallbackQuery, state: FSMContext):
         )
         await state.clear()
         await callback.message.edit_text("✅ تم إضافة زر التواصل بنجاح!", reply_markup=admin_main_keyboard_markup(callback.from_user.id))
+        return
+
+    if btn_type == "folder":
+        data = await state.get_data()
+        db.add_button(
+            text=data['text'],
+            btn_type="folder",
+            content="Folder",
+            parent_id=data.get('parent_id'),
+            created_by=callback.from_user.id
+        )
+        await state.clear()
+        await callback.message.edit_text("✅ تم إضافة زر الأب (المجلد) بنجاح!", reply_markup=admin_main_keyboard_markup(callback.from_user.id))
         return
 
     await state.set_state(ManageButtons.waiting_for_content)

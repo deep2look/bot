@@ -124,6 +124,11 @@ async def dynamic_button_handler(message: Message, state: FSMContext):
         return
 
     # Normal button actions
+    if target_btn['type'] == 'folder':
+        await state.update_data(current_parent_id=target_btn['id'])
+        await message.answer(f"📂 {target_btn['text']}", reply_markup=get_user_keyboard(target_btn['id']))
+        return
+        
     if target_btn['type'] == 'contact':
         await state.set_state(SupportState.waiting_for_message)
         await state.update_data(contact_button_id=target_btn['id'], contact_button_text=target_btn['text'])
