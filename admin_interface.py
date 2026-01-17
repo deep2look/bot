@@ -276,8 +276,18 @@ async def delete_button_handler_view(callback: CallbackQuery):
     parent_id = btn['parent_id'] if btn else None
     db.delete_button(btn_id)
     await callback.answer("✅ تم حذف الزر")
-    callback.data = f"admin:buttons_list:{parent_id}" if parent_id else "admin:buttons_list"
-    await list_buttons_admin_view(callback)
+    
+    # Refresh view by calling list_buttons_admin_view with a "mock" callback
+    # Create a simple class to mimic the callback with new data
+    class MockCallback:
+        def __init__(self, original_callback, new_data):
+            self.message = original_callback.message
+            self.from_user = original_callback.from_user
+            self.data = new_data
+            self.answer = original_callback.answer
+            
+    mock_cb = MockCallback(callback, f"admin:buttons_list:{parent_id}" if parent_id else "admin:buttons_list")
+    await list_buttons_admin_view(mock_cb)
 
 @router.callback_query(F.data.startswith("btn_edit:"))
 async def edit_button_handler(callback: CallbackQuery, state: FSMContext):
