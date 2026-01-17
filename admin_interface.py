@@ -551,9 +551,12 @@ async def view_section_logs(callback: CallbackQuery):
             username_str = f" (@{msg['username']})" if msg['username'] else ""
             sender = f"👤 {msg['full_name']}{username_str}"
         
-        logs_text += f"{sender}:\n{msg['message_text']}\n"
-        logs_text += f"📅 {msg['timestamp']}\n"
-        logs_text += f"❌ /del_{msg['id']}\n" # Command style for individual deletion if needed, but we'll use buttons for better UX
+        # Escape markdown special characters to prevent "Can't find end of the entity" error
+        safe_msg = msg['message_text'].replace('_', '\\_').replace('*', '\\*').replace('`', '\\`').replace('[', '\\[')
+        
+        logs_text += f"**{sender}:**\n{safe_msg}\n"
+        logs_text += f"📅 `{msg['timestamp']}`\n"
+        logs_text += f"❌ /del_{msg['id']}\n"
         logs_text += "────────────────\n"
     
     # Add clear all button
