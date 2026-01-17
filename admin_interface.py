@@ -613,7 +613,9 @@ async def show_admin_logs(callback: CallbackQuery):
     import html
     logs_text = "🛡️ <b>سجل عمليات المشرفين</b>\n━━━━━━━━━━━━━━━\n\n"
     for log in logs:
-        username_display = f" (@{html.escape(log['username'])})" if log.get('username') else ""
+        # sqlite3.Row doesn't have .get(), use standard indexing with check
+        username = log['username'] if 'username' in log.keys() and log['username'] else ""
+        username_display = f" (@{html.escape(username)})" if username else ""
         logs_text += f"📅 <code>{log['timestamp']}</code>\n"
         logs_text += f"👮 <b>{html.escape(log['admin_name'])}{username_display}</b>\n"
         logs_text += f"🔹 الإجراء: {html.escape(log['action_type'])}\n"
