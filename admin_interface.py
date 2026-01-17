@@ -673,11 +673,17 @@ async def delete_single_admin_log_handler(message: Message):
         return
     
     try:
-        log_id = int(message.text.split("_")[-1])
+        # Improved extraction to handle potential extra spaces or formatting
+        text = message.text.strip()
+        log_id_str = text.split("_")[-1]
+        log_id = int(log_id_str)
+        
         db.delete_admin_log(log_id)
-        await message.answer(f"✅ تم حذف السجل رقم {log_id} بنجاح.")
-    except Exception:
-        await message.answer("❌ أمر غير صالح.")
+        await message.reply(f"✅ تم حذف السجل رقم {log_id} بنجاح.")
+    except (ValueError, IndexError):
+        await message.reply("❌ أمر غير صالح. تأكد من إرسال الأمر بشكل صحيح (مثال: /del_log_15)")
+    except Exception as e:
+        await message.reply(f"❌ حدث خطأ أثناء الحذف: {str(e)}")
 
 # ======================
 # Broadcast Handlers
