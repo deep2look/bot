@@ -51,25 +51,24 @@ async def main():
     @dp.message(CommandStart())
     async def start_handler(message: Message):
         telegram_id = message.from_user.id
-        user = db.get_user_by_telegram_id(telegram_id)
+        username = message.from_user.username
+        full_name = message.from_user.full_name
         
-        if not user:
-            # First time user - show Start button
-            kb = InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text="ابدأ - Start", callback_data="user:start_registration")]
-            ])
-            await message.answer(
-                f"👋 مرحبًا بك {message.from_user.full_name}\n"
-                "اضغط على الزر أدناه للبدء واستخدام خدمات البوت.",
-                reply_markup=kb
-            )
-        else:
-            is_admin = user["role"] in ("super_admin", "admin", "supervisor")
-            await message.answer(
-                f"👋 مرحباً بك {message.from_user.full_name}\n"
-                "في البوت الخاص بدورة صناعة المحدث.",
-                reply_markup=main_menu_keyboard(is_admin=is_admin)
-            )
+        # Ensure user exists in DB and update info immediately
+        db.add_user(telegram_id=telegram_id, username=username, full_name=full_name)
+        db.update_user_info(telegram_id, username, full_name)
+        
+        # Log to confirm in console
+        logging.info(f"Start command: ID={telegram_id}, Username={username}, Name={full_name}")
+            
+        user = db.get_user_by_telegram_id(telegram_id)
+        is_admin = user["role"] in ("super_admin", "admin", "supervisor")
+        
+        await message.answer(
+            f"👋 مرحباً بك {message.from_user.full_name}\n"
+            "في البوت الخاص بدورة صناعة المحدث.",
+            reply_markup=main_menu_keyboard(is_admin=is_admin)
+        )
 
     @dp.callback_query(F.data == "user:start_registration")
     async def process_registration(callback: CallbackQuery):
