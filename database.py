@@ -268,8 +268,8 @@ class Database:
 
     def add_admin_log(self, admin_id, admin_name, action_type, section, details):
         user = self.get_user_by_telegram_id(admin_id)
-        # Handle case where user info might not be in DB yet
-        username = user['username'] if user and 'username' in user.keys() and user['username'] else None
+        # Use existing username from users table
+        username = user['username'] if user and user['username'] else None
         self.cursor.execute("""
             INSERT INTO admin_logs (admin_id, admin_name, action_type, section, details, username)
             VALUES (?, ?, ?, ?, ?, ?)
