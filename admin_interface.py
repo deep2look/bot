@@ -627,7 +627,41 @@ async def show_admin_logs(callback: CallbackQuery):
     if len(logs_text) > 4000:
         logs_text = logs_text[:4000]
 
-    await callback.message.edit_text(logs_text, reply_markup=back_to_admin_button(), parse_mode="HTML")
+    keyboard = [
+        [InlineKeyboardButton(text="🗑️ مسح السجل بالكامل", callback_data="admin:confirm_clear_logs")],
+        [InlineKeyboardButton(text="⬅️ رجوع", callback_data="admin:panel")]
+    ]
+
+    await callback.message.edit_text(logs_text, reply_markup=InlineKeyboardMarkup(inline_keyboard=keyboard), parse_mode="HTML")
+
+@router.callback_query(F.data == "admin:confirm_clear_logs")
+async def confirm_clear_logs(callback: CallbackQuery):
+    if not is_super_admin_user(callback.from_user.id):
+        await callback.answer("للأدمن الأساسي فقط", show_alert=True)
+        return
+        
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="✅ نعم، امسح الكل", callback_data="admin:clear_all_logs_final")],
+        [InlineKeyboardButton(text="❌ تراجع", callback_data="admin:admin_logs")]
+    ])
+    
+    await callback.message.edit_text(
+        "⚠️ **هل أنت متأكد من مسح سجل المشرفين بالكامل؟**\nلا يمكن التراجع عن هذا الإجراء.",
+        reply_markup=keyboard,
+        parse_mode="Markdown"
+    )
+
+@router.callback_query(F.data == "admin:clear_all_logs_final")
+async def clear_all_logs_final(callback: CallbackQuery):
+    if not is_super_admin_user(callback.from_user.id):
+        await callback.answer("للأدمن الأساسي فقط", show_alert=True)
+        return
+        
+    db.clear_all_admin_logs()
+    db.add_admin_log(callback.from_user.id, callback.from_user.full_name, "مسح السجل", "🛡️ سجل المشرفين", "قام بمسح سجل العمليات بالكامل")
+    
+    await callback.answer("✅ تم مسح السجل بالكامل بنجاح", show_alert=True)
+    await show_admin_logs(callback)
 
 @router.callback_query(F.data.startswith("logs:clear_all:"))
 async def clear_all_logs(callback: CallbackQuery):
