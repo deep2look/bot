@@ -559,6 +559,7 @@ async def view_section_logs(callback: CallbackQuery):
         )
         return
 
+    import html
     logs_text = f"📜 <b>سجل المراسلات: {html.escape(btn['text'])}</b>\n\n"
     keyboard = []
     
@@ -569,7 +570,6 @@ async def view_section_logs(callback: CallbackQuery):
             sender = f"👤 {msg['full_name']}{username_str}"
         
         # Use HTML escaping for better stability
-        import html
         safe_msg = html.escape(msg['message_text'])
         
         logs_text += f"<b>{html.escape(sender)}:</b>\n{safe_msg}\n"
