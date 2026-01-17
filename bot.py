@@ -77,15 +77,20 @@ async def main():
         username = callback.from_user.username
         full_name = callback.from_user.full_name
         
-        db.add_user(telegram_id=telegram_id, username=username, full_name=full_name)
-        db.update_user_info(telegram_id, username, full_name) # Ensure info is up to date
+        # Check if user exists and has a special role
+        existing_user = db.get_user_by_telegram_id(telegram_id)
+        role = existing_user["role"] if existing_user else "user"
+        
+        # Add or update user info while preserving role
+        db.add_user(telegram_id=telegram_id, username=username, full_name=full_name, role=role)
+        db.update_user_info(telegram_id, username, full_name)
         
         user = db.get_user_by_telegram_id(telegram_id)
         is_admin = user["role"] in ("super_admin", "admin", "supervisor")
         
         await callback.message.delete()
         await callback.message.answer(
-            "✅ تم تسجيلك بنجاح! أهلاً بك في خدمات البوت.",
+            "✅ تم تسجيل بياناتك بنجاح! أهلاً بك في خدمات البوت.",
             reply_markup=main_menu_keyboard(is_admin=is_admin)
         )
         await callback.answer()
