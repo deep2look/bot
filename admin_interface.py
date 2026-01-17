@@ -217,19 +217,17 @@ async def list_users_paged(callback: CallbackQuery):
     keyboard = []
     
     for user in users:
-        status = "✅" if user['is_active'] else "🚫"
+        status_emoji = "✅" if user['is_active'] else "🚫"
         name = user['full_name'] or "بدون اسم"
         username = f"@{user['username']}" if user['username'] else f"ID: {user['telegram_id']}"
         
-        users_text += f"{status} {html.escape(name)} ({username})\n"
+        users_text += f"{status_emoji} {html.escape(name)} ({username})\n"
         
-        # Action buttons for each user
-        row = [
-            InlineKeyboardButton(text=f"👤 {name[:15]}", callback_data=f"user:view_action:{user['telegram_id']}"),
-            InlineKeyboardButton(text="🗑️ حذف", callback_data=f"user:delete:{user['telegram_id']}:{page}"),
-            InlineKeyboardButton(text="🚫 حظر/فك" if user['is_active'] else "✅ فك حظر", callback_data=f"user:toggle_block:{user['telegram_id']}:{page}")
-        ]
-        keyboard.append(row)
+        # Action commands as text
+        if user['is_active']:
+            users_text += f"└ 🗑️ /delete_{user['telegram_id']} | 🚫 /ban_{user['telegram_id']}\n\n"
+        else:
+            users_text += f"└ 🗑️ /delete_{user['telegram_id']} | ✅ /unban_{user['telegram_id']}\n\n"
 
     # Navigation buttons
     nav_row = []
@@ -264,19 +262,45 @@ async def toggle_block_user(callback: CallbackQuery):
         await callback.answer(f"✅ تم {action} المستخدم")
         await list_users_paged(callback) # Refresh current page
 
-@router.callback_query(F.data.startswith("user:delete:"))
-async def delete_user_from_list(callback: CallbackQuery):
-    parts = callback.data.split(":")
-    user_id = int(parts[2])
-    page = int(parts[3])
-    
-    # Simple direct delete for now as requested
-    db.cursor.execute("DELETE FROM users WHERE telegram_id = ?", (user_id,))
-    db.conn.commit()
-    db.add_admin_log(callback.from_user.id, callback.from_user.full_name, "حذف مستخدم", "إدارة المستخدمين", f"قام بحذف المستخدم {user_id} نهائياً")
-    
-    await callback.answer("✅ تم حذف المستخدم بنجاح")
-    await list_users_paged(callback) # Refresh current page
+@router.message(F.text.startswith("/delete_"))
+async def handle_text_delete(message: Message):
+    if not db.get_user_by_telegram_id(message.from_user.id) or db.get_user_by_telegram_id(message.from_user.id)['role'] not in ('super_admin', 'admin'):
+        return
+        
+    try:
+        user_id = int(message.text.split("_")[1])
+        db.cursor.execute("DELETE FROM users WHERE telegram_id = ?", (user_id,))
+        db.conn.commit()
+        db.add_admin_log(message.from_user.id, message.from_user.full_name, "حذف مستخدم", "إدارة المستخدمين", f"قام بحذف المستخدم {user_id} عبر الأمر النصي")
+        await message.reply(f"✅ تم حذف المستخدم {user_id} بنجاح")
+    except Exception as e:
+        await message.reply("❌ حدث خطأ أثناء الحذف")
+
+@router.message(F.text.startswith("/ban_"))
+async def handle_text_ban(message: Message):
+    if not db.get_user_by_telegram_id(message.from_user.id) or db.get_user_by_telegram_id(message.from_user.id)['role'] not in ('super_admin', 'admin'):
+        return
+        
+    try:
+        user_id = int(message.text.split("_")[1])
+        db.set_user_active(user_id, 0)
+        db.add_admin_log(message.from_user.id, message.from_user.full_name, "حظر", "إدارة المستخدمين", f"قام بحظر المستخدم {user_id} عبر الأمر النصي")
+        await message.reply(f"🚫 تم حظر المستخدم {user_id} بنجاح")
+    except Exception as e:
+        await message.reply("❌ حدث خطأ أثناء الحظر")
+
+@router.message(F.text.startswith("/unban_"))
+async def handle_text_unban(message: Message):
+    if not db.get_user_by_telegram_id(message.from_user.id) or db.get_user_by_telegram_id(message.from_user.id)['role'] not in ('super_admin', 'admin'):
+        return
+        
+    try:
+        user_id = int(message.text.split("_")[1])
+        db.set_user_active(user_id, 1)
+        db.add_admin_log(message.from_user.id, message.from_user.full_name, "فك حظر", "إدارة المستخدمين", f"قام بفك حظر المستخدم {user_id} عبر الأمر النصي")
+        await message.reply(f"✅ تم فك حظر المستخدم {user_id} بنجاح")
+    except Exception as e:
+        await message.reply("❌ حدث خطأ أثناء فك الحظر")
 
 @router.callback_query(F.data.startswith("button:add"))
 async def add_button_start_handler(callback: CallbackQuery, state: FSMContext):
