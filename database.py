@@ -118,9 +118,18 @@ class Database:
         )
         self.conn.commit()
 
-    def get_total_users_count(self):
-        self.cursor.execute("SELECT COUNT(*) FROM users")
+    def get_total_supervisors_count(self):
+        self.cursor.execute("SELECT COUNT(*) FROM users WHERE role IN ('admin', 'supervisor')")
         return self.cursor.fetchone()[0]
+
+    def get_users_paged(self, page=1, per_page=10):
+        offset = (page - 1) * per_page
+        self.cursor.execute("SELECT * FROM users ORDER BY joined_at DESC LIMIT ? OFFSET ?", (per_page, offset))
+        return self.cursor.fetchall()
+
+    def set_user_active(self, telegram_id, is_active):
+        self.cursor.execute("UPDATE users SET is_active = ? WHERE telegram_id = ?", (is_active, telegram_id))
+        self.conn.commit()
 
     def get_user_by_telegram_id(self, telegram_id):
         self.cursor.execute(

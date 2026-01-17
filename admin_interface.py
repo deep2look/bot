@@ -180,19 +180,103 @@ async def move_button_handler(callback: CallbackQuery):
 @router.callback_query(F.data == "admin:stats")
 async def stats_handler_view(callback: CallbackQuery):
     total_users = db.get_total_users_count()
+    total_supervisors = db.get_total_supervisors_count()
     
     stats_text = (
         "📊 **إحصائيات البوت الحية**\n\n"
         f"👥 إجمالي المستخدمين: `{total_users}`\n"
+        f"👮 إجمالي المشرفين: `{total_supervisors}`\n"
         "━━━━━━━━━━━━━━━\n"
         "💡 هذه الإحصائيات محدثة بشكل حي من قاعدة البيانات."
     )
     
+    keyboard = [
+        [InlineKeyboardButton(text="👥 إدارة جميع المستخدمين", callback_data="admin:users_list:1")],
+        [InlineKeyboardButton(text="⬅️ رجوع", callback_data="admin:panel")]
+    ]
+    
     await callback.message.edit_text(
         stats_text,
-        reply_markup=back_to_admin_button(),
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=keyboard),
         parse_mode="Markdown"
     )
+
+@router.callback_query(F.data.startswith("admin:users_list:"))
+async def list_users_paged(callback: CallbackQuery):
+    page = int(callback.data.split(":")[-1])
+    per_page = 10
+    users = db.get_users_paged(page, per_page)
+    total_users = db.get_total_users_count()
+    total_pages = (total_users + per_page - 1) // per_page
+    
+    if not users:
+        await callback.message.edit_text("لا يوجد مستخدمون حالياً.", reply_markup=back_to_admin_button())
+        return
+
+    users_text = f"👥 **قائمة المستخدمين (صفحة {page} من {total_pages}):**\n\n"
+    keyboard = []
+    
+    for user in users:
+        status = "✅" if user['is_active'] else "🚫"
+        name = user['full_name'] or "بدون اسم"
+        username = f"@{user['username']}" if user['username'] else f"ID: {user['telegram_id']}"
+        
+        users_text += f"{status} {html.escape(name)} ({username})\n"
+        
+        # Action buttons for each user
+        row = [
+            InlineKeyboardButton(text=f"👤 {name[:15]}", callback_data=f"user:view_action:{user['telegram_id']}"),
+            InlineKeyboardButton(text="🗑️ حذف", callback_data=f"user:delete:{user['telegram_id']}:{page}"),
+            InlineKeyboardButton(text="🚫 حظر/فك" if user['is_active'] else "✅ فك حظر", callback_data=f"user:toggle_block:{user['telegram_id']}:{page}")
+        ]
+        keyboard.append(row)
+
+    # Navigation buttons
+    nav_row = []
+    if page > 1:
+        nav_row.append(InlineKeyboardButton(text="⬅️ السابق", callback_data=f"admin:users_list:{page-1}"))
+    if page < total_pages:
+        nav_row.append(InlineKeyboardButton(text="التالي ➡️", callback_data=f"admin:users_list:{page+1}"))
+    
+    if nav_row:
+        keyboard.append(nav_row)
+        
+    keyboard.append([InlineKeyboardButton(text="⬅️ رجوع للإحصائيات", callback_data="admin:stats")])
+    
+    await callback.message.edit_text(
+        users_text,
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=keyboard),
+        parse_mode="HTML"
+    )
+
+@router.callback_query(F.data.startswith("user:toggle_block:"))
+async def toggle_block_user(callback: CallbackQuery):
+    parts = callback.data.split(":")
+    user_id = int(parts[2])
+    page = int(parts[3])
+    
+    user = db.get_user_by_telegram_id(user_id)
+    if user:
+        new_status = 0 if user['is_active'] else 1
+        db.set_user_active(user_id, new_status)
+        action = "حظر" if new_status == 0 else "فك حظر"
+        db.add_admin_log(callback.from_user.id, callback.from_user.full_name, action, "إدارة المستخدمين", f"قام بـ {action} المستخدم {user_id}")
+        await callback.answer(f"✅ تم {action} المستخدم")
+        await list_users_paged(callback) # Refresh current page
+
+@router.callback_query(F.data.startswith("user:delete:"))
+async def delete_user_from_list(callback: CallbackQuery):
+    parts = callback.data.split(":")
+    user_id = int(parts[2])
+    page = int(parts[3])
+    
+    # Simple direct delete for now as requested
+    db.cursor.execute("DELETE FROM users WHERE telegram_id = ?", (user_id,))
+    db.conn.commit()
+    db.add_admin_log(callback.from_user.id, callback.from_user.full_name, "حذف مستخدم", "إدارة المستخدمين", f"قام بحذف المستخدم {user_id} نهائياً")
+    
+    await callback.answer("✅ تم حذف المستخدم بنجاح")
+    await list_users_paged(callback) # Refresh current page
 
 @router.callback_query(F.data.startswith("button:add"))
 async def add_button_start_handler(callback: CallbackQuery, state: FSMContext):
