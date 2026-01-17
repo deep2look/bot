@@ -233,6 +233,7 @@ async def add_button_type_handler(callback: CallbackQuery, state: FSMContext):
             parent_id=data.get('parent_id'),
             created_by=callback.from_user.id
         )
+        db.add_admin_log(callback.from_user.id, callback.from_user.full_name, "إضافة زر", "إدارة الأزرار", f"إضافة زر تواصل جديد: {data['text']}")
         await state.clear()
         await callback.message.edit_text("✅ تم إضافة زر التواصل بنجاح!", reply_markup=admin_main_keyboard_markup(callback.from_user.id))
         return
@@ -246,6 +247,7 @@ async def add_button_type_handler(callback: CallbackQuery, state: FSMContext):
             parent_id=data.get('parent_id'),
             created_by=callback.from_user.id
         )
+        db.add_admin_log(callback.from_user.id, callback.from_user.full_name, "إضافة زر", "إدارة الأزرار", f"إضافة زر مجلد جديد: {data['text']}")
         await state.clear()
         await callback.message.edit_text("✅ تم إضافة زر الأب (المجلد) بنجاح!", reply_markup=admin_main_keyboard_markup(callback.from_user.id))
         return
