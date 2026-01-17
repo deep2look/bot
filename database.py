@@ -277,6 +277,10 @@ class Database:
         self.cursor.execute("SELECT * FROM admin_logs ORDER BY timestamp DESC LIMIT ?", (limit,))
         return self.cursor.fetchall()
 
+    def get_contact_buttons(self):
+        self.cursor.execute("SELECT * FROM buttons WHERE type = 'contact' AND is_active = 1")
+        return self.cursor.fetchall()
+
     def delete_support_message(self, message_id):
         self.cursor.execute("DELETE FROM support_messages WHERE id = ?", (message_id,))
         self.conn.commit()
