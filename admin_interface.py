@@ -551,11 +551,12 @@ async def view_section_logs(callback: CallbackQuery):
             username_str = f" (@{msg['username']})" if msg['username'] else ""
             sender = f"👤 {msg['full_name']}{username_str}"
         
-        # Escape markdown special characters to prevent "Can't find end of the entity" error
-        safe_msg = msg['message_text'].replace('_', '\\_').replace('*', '\\*').replace('`', '\\`').replace('[', '\\[')
+        # Use HTML escaping for better stability
+        import html
+        safe_msg = html.escape(msg['message_text'])
         
-        logs_text += f"**{sender}:**\n{safe_msg}\n"
-        logs_text += f"📅 `{msg['timestamp']}`\n"
+        logs_text += f"<b>{html.escape(sender)}:</b>\n{safe_msg}\n"
+        logs_text += f"📅 <code>{msg['timestamp']}</code>\n"
         logs_text += f"❌ /del_{msg['id']}\n"
         logs_text += "────────────────\n"
     
@@ -573,7 +574,7 @@ async def view_section_logs(callback: CallbackQuery):
     if len(logs_text) > 4000:
         logs_text = logs_text[-4000:]
         
-    await callback.message.edit_text(logs_text, reply_markup=InlineKeyboardMarkup(inline_keyboard=keyboard), parse_mode="Markdown")
+    await callback.message.edit_text(logs_text, reply_markup=InlineKeyboardMarkup(inline_keyboard=keyboard), parse_mode="HTML")
 
 @router.callback_query(F.data.startswith("logs:clear_all:"))
 async def clear_all_logs(callback: CallbackQuery):
