@@ -558,7 +558,7 @@ async def view_section_logs(callback: CallbackQuery):
         )
         return
 
-    logs_text = f"📜 **سجل المراسلات: {btn['text']}**\n\n"
+    logs_text = f"📜 <b>سجل المراسلات: {html.escape(btn['text'])}</b>\n\n"
     keyboard = []
     
     for msg in messages:
@@ -573,7 +573,7 @@ async def view_section_logs(callback: CallbackQuery):
         
         logs_text += f"<b>{html.escape(sender)}:</b>\n{safe_msg}\n"
         logs_text += f"📅 <code>{msg['timestamp']}</code>\n"
-        logs_text += f"❌ /del_{msg['id']}\n"
+        logs_text += f"❌ /del\_{msg['id']}\n"
         logs_text += "────────────────\n"
     
     # Add clear all button
@@ -599,83 +599,36 @@ async def clear_all_logs(callback: CallbackQuery):
     await callback.answer("✅ تم مسح جميع الرسائل بنجاح")
     await callback.message.edit_text("📜 تم مسح السجل بالكامل.", reply_markup=back_to_admin_button())
 
-@router.message(F.text.startswith("/del_"))
-async def delete_single_log_command(message: Message):
-    if not is_admin_user(message.from_user.id):
-        return
-    
-    try:
-        msg_id = int(message.text.split("_")[1])
-        msg = db.get_message_by_id(msg_id)
-        if msg:
-            db.delete_support_message(msg_id)
-            await message.answer(f"✅ تم حذف الرسالة بنجاح.")
-        else:
-            await message.answer("❌ الرسالة غير موجودة.")
-    except Exception:
-        await message.answer("❌ أمر غير صالح.")
-
-@router.callback_query(F.data == "admin:admin_logs")
-async def show_admin_logs(callback: CallbackQuery):
-    if not is_super_admin_user(callback.from_user.id):
-        await callback.answer("للأدمن الأساسي فقط", show_alert=True)
-        return
-
-    logs = db.get_admin_logs(15)
-    if not logs:
-        await callback.message.edit_text("🛡️ سجل المشرفين فارغ حالياً.", reply_markup=back_to_admin_button())
-        return
-
-    import html
-    logs_text = "🛡️ <b>سجل عمليات المشرفين</b>\n━━━━━━━━━━━━━━━\n\n"
-    for log in logs:
-        # sqlite3.Row doesn't have .get(), use standard indexing with check
-        username = log['username'] if 'username' in log.keys() and log['username'] else ""
-        username_display = f" (@{html.escape(username)})" if username else ""
-        logs_text += f"📅 <code>{log['timestamp']}</code>\n"
-        logs_text += f"👮 <b>{html.escape(log['admin_name'])}{username_display}</b>\n"
-        logs_text += f"🔹 الإجراء: {html.escape(log['action_type'])}\n"
-        logs_text += f"📂 القسم: {html.escape(log['section'])}\n"
-        logs_text += f"📝 تفاصيل: {html.escape(log['details'])}\n"
-        logs_text += f"❌ /del_log_{log['id']}\n"
-        logs_text += "────────────────\n"
-
-    keyboard = [
-        [InlineKeyboardButton(text="🗑️ مسح السجل بالكامل", callback_data="admin:clear_logs_confirm")],
-        [InlineKeyboardButton(text="⬅️ رجوع", callback_data="admin:panel")]
-    ]
-
-    await callback.message.edit_text(logs_text, reply_markup=InlineKeyboardMarkup(inline_keyboard=keyboard), parse_mode="HTML")
-
-@router.callback_query(F.data == "admin:clear_logs_confirm")
-async def clear_logs_confirm_handler(callback: CallbackQuery):
-    if not is_super_admin_user(callback.from_user.id):
-        return
-    
-    keyboard = [
-        [InlineKeyboardButton(text="✅ نعم، امسح الكل", callback_data="admin:clear_logs_execute")],
-        [InlineKeyboardButton(text="❌ تراجع", callback_data="admin:admin_logs")]
-    ]
-    await callback.message.edit_text("⚠️ هل أنت متأكد من مسح سجل العمليات بالكامل؟ لا يمكن التراجع عن هذا الإجراء.", reply_markup=InlineKeyboardMarkup(inline_keyboard=keyboard))
-
-@router.callback_query(F.data == "admin:clear_logs_execute")
-async def clear_logs_execute_handler(callback: CallbackQuery):
-    if not is_super_admin_user(callback.from_user.id):
-        return
-    
-    db.clear_all_admin_logs()
-    await callback.answer("✅ تم مسح السجل بنجاح")
-    await callback.message.edit_text("✅ تم مسح سجل العمليات بالكامل.", reply_markup=back_to_admin_button())
-
 @router.message(F.text.startswith("/del_log_"))
 async def delete_single_admin_log_handler(message: Message):
     if not is_super_admin_user(message.from_user.id):
         return
     
     try:
-        msg_id = int(message.text.split("_")[-1])
+        parts = message.text.split("_")
+        msg_id = int(parts[-1])
         db.delete_admin_log(msg_id)
-        await message.answer(f"✅ تم حذف السجل بنجاح.")
+        await message.answer("✅ تم حذف السجل بنجاح.")
+    except Exception:
+        await message.answer("❌ أمر غير صالح.")
+
+@router.message(F.text.startswith("/del_"))
+async def delete_single_log_command(message: Message):
+    if not is_admin_user(message.from_user.id):
+        return
+    
+    if message.text.startswith("/del_log_"):
+        return
+
+    try:
+        parts = message.text.split("_")
+        msg_id = int(parts[-1])
+        msg = db.get_message_by_id(msg_id)
+        if msg:
+            db.delete_support_message(msg_id)
+            await message.answer("✅ تم حذف الرسالة بنجاح.")
+        else:
+            await message.answer("❌ الرسالة غير موجودة.")
     except Exception:
         await message.answer("❌ أمر غير صالح.")
 
