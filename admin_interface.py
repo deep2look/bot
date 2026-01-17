@@ -593,6 +593,32 @@ async def view_section_logs(callback: CallbackQuery):
         
     await callback.message.edit_text(logs_text, reply_markup=InlineKeyboardMarkup(inline_keyboard=keyboard), parse_mode="HTML")
 
+@router.callback_query(F.data == "admin:admin_logs")
+async def show_admin_logs(callback: CallbackQuery):
+    if not is_super_admin_user(callback.from_user.id):
+        await callback.answer("للأدمن الأساسي فقط", show_alert=True)
+        return
+        
+    logs = db.get_admin_logs(limit=20)
+    if not logs:
+        await callback.message.edit_text("🛡️ سجل المشرفين فارغ حالياً.", reply_markup=back_to_admin_button())
+        return
+
+    logs_text = "🛡️ <b>سجل المشرفين (آخر 20 عملية):</b>\n\n"
+    for log in logs:
+        logs_text += f"👤 <b>{html.escape(log['admin_name'])}</b> ({log['admin_id']})\n"
+        logs_text += f"🛠️ <b>العملية:</b> {html.escape(log['action'])}\n"
+        logs_text += f"📁 <b>القسم:</b> {html.escape(log['section'])}\n"
+        logs_text += f"📝 <b>التفاصيل:</b> {html.escape(log['details'])}\n"
+        logs_text += f"📅 <code>{log['timestamp']}</code>\n"
+        logs_text += f"❌ /del_log_{log['id']}\n"
+        logs_text += "────────────────\n"
+
+    if len(logs_text) > 4000:
+        logs_text = logs_text[:4000]
+
+    await callback.message.edit_text(logs_text, reply_markup=back_to_admin_button(), parse_mode="HTML")
+
 @router.callback_query(F.data.startswith("logs:clear_all:"))
 async def clear_all_logs(callback: CallbackQuery):
     button_id = int(callback.data.split(":")[-1])
