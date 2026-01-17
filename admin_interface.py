@@ -606,11 +606,12 @@ async def show_admin_logs(callback: CallbackQuery):
 
     logs_text = "🛡️ <b>سجل المشرفين (آخر 20 عملية):</b>\n\n"
     for log in logs:
-        admin_display = f"{html.escape(log['admin_name'])}"
+        # Default: Name + Username
         if log['username']:
-            admin_display += f" (@{html.escape(log['username'])})"
+            admin_display = f"{html.escape(log['admin_name'])} (@{html.escape(log['username'])})"
         else:
-            admin_display += f" ({log['admin_id']})"
+            # Fallback: Name + ID
+            admin_display = f"{html.escape(log['admin_name'])} ({log['admin_id']})"
             
         logs_text += f"👤 <b>{admin_display}</b>\n"
         logs_text += f"🛠️ <b>العملية:</b> {html.escape(log['action_type'])}\n"
