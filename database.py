@@ -268,12 +268,15 @@ class Database:
 
     def add_admin_log(self, admin_id, admin_name, action_type, section, details):
         user = self.get_user_by_telegram_id(admin_id)
-        # Use existing username from users table
+        # Use existing name and username from users table to ensure consistency
+        # If user is not in DB (rare), fall back to provided admin_name
+        current_name = user['full_name'] if user and user['full_name'] else admin_name
         username = user['username'] if user and user['username'] else None
+        
         self.cursor.execute("""
             INSERT INTO admin_logs (admin_id, admin_name, action_type, section, details, username)
             VALUES (?, ?, ?, ?, ?, ?)
-        """, (admin_id, admin_name, action_type, section, details, username))
+        """, (admin_id, current_name, action_type, section, details, username))
         self.conn.commit()
 
     def delete_admin_log(self, log_id):

@@ -606,16 +606,15 @@ async def show_admin_logs(callback: CallbackQuery):
 
     logs_text = "🛡️ <b>سجل المشرفين (آخر 20 عملية):</b>\n\n"
     for log in logs:
-        # Re-fetch admin info to get latest username from users table if possible
-        admin_info = db.get_user_by_telegram_id(log['admin_id'])
-        current_username = admin_info['username'] if admin_info else log['username']
+        # Use the name and username recorded in the log
+        # These are now guaranteed to be from the database at the time of logging
+        admin_name = html.escape(log['admin_name'])
+        username = log['username']
         
-        # Default: Name + Username
-        if current_username:
-            admin_display = f"{html.escape(log['admin_name'])} (@{html.escape(current_username)})"
+        if username:
+            admin_display = f"{admin_name} (@{html.escape(username)})"
         else:
-            # Fallback: Name + ID
-            admin_display = f"{html.escape(log['admin_name'])} ({log['admin_id']})"
+            admin_display = f"{admin_name} ({log['admin_id']})"
             
         logs_text += f"👤 <b>{admin_display}</b>\n"
         logs_text += f"🛠️ <b>العملية:</b> {html.escape(log['action_type'])}\n"
