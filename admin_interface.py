@@ -543,15 +543,24 @@ async def view_section_logs(callback: CallbackQuery):
         return
 
     logs_text = f"📜 **سجل المراسلات: {btn['text']}**\n\n"
+    keyboard = []
+    
     for msg in messages:
-        sender = "👤 المستخدم" if not msg['is_from_admin'] else "🛠️ الإدارة"
-        logs_text += f"{sender}: {msg['message_text']}\n"
+        sender = "🛠️ الإدارة"
+        if not msg['is_from_admin']:
+            username_str = f" (@{msg['username']})" if msg['username'] else ""
+            sender = f"👤 {msg['full_name']}{username_str}"
+        
+        logs_text += f"{sender}:\n{msg['message_text']}\n"
         logs_text += f"📅 {msg['timestamp']}\n"
+        logs_text += f"❌ /del_{msg['id']}\n" # Command style for individual deletion if needed, but we'll use buttons for better UX
         logs_text += "────────────────\n"
+    
+    # Add clear all button
+    keyboard.append([InlineKeyboardButton(text="🗑️ مسح الكل", callback_data=f"logs:clear_all:{button_id}")])
     
     # Add reply button for the last user if the last message was from a user
     last_msg = messages[-1]
-    keyboard = []
     if not last_msg['is_from_admin']:
         keyboard.append([InlineKeyboardButton(text="💬 رد على آخر رسالة", callback_data=f"support:reply:{last_msg['user_id']}:{button_id}")])
     
@@ -562,6 +571,29 @@ async def view_section_logs(callback: CallbackQuery):
         logs_text = logs_text[-4000:]
         
     await callback.message.edit_text(logs_text, reply_markup=InlineKeyboardMarkup(inline_keyboard=keyboard), parse_mode="Markdown")
+
+@router.callback_query(F.data.startswith("logs:clear_all:"))
+async def clear_all_logs(callback: CallbackQuery):
+    button_id = int(callback.data.split(":")[-1])
+    db.clear_support_messages_by_button(button_id)
+    await callback.answer("✅ تم مسح جميع الرسائل بنجاح")
+    await callback.message.edit_text("📜 تم مسح السجل بالكامل.", reply_markup=back_to_admin_button())
+
+@router.message(F.text.startswith("/del_"))
+async def delete_single_log_command(message: Message):
+    if not is_admin_user(message.from_user.id):
+        return
+    
+    try:
+        msg_id = int(message.text.split("_")[1])
+        msg = db.get_message_by_id(msg_id)
+        if msg:
+            db.delete_support_message(msg_id)
+            await message.answer(f"✅ تم حذف الرسالة بنجاح.")
+        else:
+            await message.answer("❌ الرسالة غير موجودة.")
+    except Exception:
+        await message.answer("❌ أمر غير صالح.")
 
 @router.callback_query(F.data == "admin:admin_logs")
 async def show_admin_logs(callback: CallbackQuery):
