@@ -267,10 +267,20 @@ class Database:
         return self.cursor.fetchall()
 
     def add_admin_log(self, admin_id, admin_name, action_type, section, details):
+        user = self.get_user_by_telegram_id(admin_id)
+        username = user['username'] if user and user['username'] else None
         self.cursor.execute("""
-            INSERT INTO admin_logs (admin_id, admin_name, action_type, section, details)
-            VALUES (?, ?, ?, ?, ?)
-        """, (admin_id, admin_name, action_type, section, details))
+            INSERT INTO admin_logs (admin_id, admin_name, action_type, section, details, username)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (admin_id, admin_name, action_type, section, details, username))
+        self.conn.commit()
+
+    def delete_admin_log(self, log_id):
+        self.cursor.execute("DELETE FROM admin_logs WHERE id = ?", (log_id,))
+        self.conn.commit()
+
+    def clear_all_admin_logs(self):
+        self.cursor.execute("DELETE FROM admin_logs")
         self.conn.commit()
 
     def get_admin_logs(self, limit=20):

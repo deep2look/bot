@@ -610,16 +610,56 @@ async def show_admin_logs(callback: CallbackQuery):
         await callback.message.edit_text("🛡️ سجل المشرفين فارغ حالياً.", reply_markup=back_to_admin_button())
         return
 
-    logs_text = "🛡️ **سجل عمليات المشرفين**\n━━━━━━━━━━━━━━━\n\n"
+    import html
+    logs_text = "🛡️ <b>سجل عمليات المشرفين</b>\n━━━━━━━━━━━━━━━\n\n"
     for log in logs:
-        logs_text += f"📅 `{log['timestamp']}`\n"
-        logs_text += f"👮 **{log['admin_name']}**\n"
-        logs_text += f"🔹 الإجراء: {log['action_type']}\n"
-        logs_text += f"📂 القسم: {log['section']}\n"
-        logs_text += f"📝 تفاصيل: {log['details']}\n"
+        username_display = f" (@{html.escape(log['username'])})" if log.get('username') else ""
+        logs_text += f"📅 <code>{log['timestamp']}</code>\n"
+        logs_text += f"👮 <b>{html.escape(log['admin_name'])}{username_display}</b>\n"
+        logs_text += f"🔹 الإجراء: {html.escape(log['action_type'])}\n"
+        logs_text += f"📂 القسم: {html.escape(log['section'])}\n"
+        logs_text += f"📝 تفاصيل: {html.escape(log['details'])}\n"
+        logs_text += f"❌ /del_log_{log['id']}\n"
         logs_text += "────────────────\n"
 
-    await callback.message.edit_text(logs_text, reply_markup=back_to_admin_button(), parse_mode="Markdown")
+    keyboard = [
+        [InlineKeyboardButton(text="🗑️ مسح السجل بالكامل", callback_data="admin:clear_logs_confirm")],
+        [InlineKeyboardButton(text="⬅️ رجوع", callback_data="admin:panel")]
+    ]
+
+    await callback.message.edit_text(logs_text, reply_markup=InlineKeyboardMarkup(inline_keyboard=keyboard), parse_mode="HTML")
+
+@router.callback_query(F.data == "admin:clear_logs_confirm")
+async def clear_logs_confirm_handler(callback: CallbackQuery):
+    if not is_super_admin_user(callback.from_user.id):
+        return
+    
+    keyboard = [
+        [InlineKeyboardButton(text="✅ نعم، امسح الكل", callback_data="admin:clear_logs_execute")],
+        [InlineKeyboardButton(text="❌ تراجع", callback_data="admin:admin_logs")]
+    ]
+    await callback.message.edit_text("⚠️ هل أنت متأكد من مسح سجل العمليات بالكامل؟ لا يمكن التراجع عن هذا الإجراء.", reply_markup=InlineKeyboardMarkup(inline_keyboard=keyboard))
+
+@router.callback_query(F.data == "admin:clear_logs_execute")
+async def clear_logs_execute_handler(callback: CallbackQuery):
+    if not is_super_admin_user(callback.from_user.id):
+        return
+    
+    db.clear_all_admin_logs()
+    await callback.answer("✅ تم مسح السجل بنجاح")
+    await callback.message.edit_text("✅ تم مسح سجل العمليات بالكامل.", reply_markup=back_to_admin_button())
+
+@router.message(F.text.startswith("/del_log_"))
+async def delete_single_admin_log_handler(message: Message):
+    if not is_super_admin_user(message.from_user.id):
+        return
+    
+    try:
+        log_id = int(message.text.split("_")[-1])
+        db.delete_admin_log(log_id)
+        await message.answer(f"✅ تم حذف السجل رقم {log_id} بنجاح.")
+    except Exception:
+        await message.answer("❌ أمر غير صالح.")
 
 # ======================
 # Broadcast Handlers
