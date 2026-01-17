@@ -118,6 +118,10 @@ class Database:
         )
         self.conn.commit()
 
+    def get_total_users_count(self):
+        self.cursor.execute("SELECT COUNT(*) FROM users")
+        return self.cursor.fetchone()[0]
+
     def get_total_supervisors_count(self):
         self.cursor.execute("SELECT COUNT(*) FROM users WHERE role IN ('admin', 'supervisor')")
         return self.cursor.fetchone()[0]
