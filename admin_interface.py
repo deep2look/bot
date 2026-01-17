@@ -269,12 +269,20 @@ async def handle_text_delete(message: Message):
         
     try:
         user_id = int(message.text.split("_")[1])
-        db.cursor.execute("DELETE FROM users WHERE telegram_id = ?", (user_id,))
-        db.conn.commit()
-        db.add_admin_log(message.from_user.id, message.from_user.full_name, "حذف مستخدم", "إدارة المستخدمين", f"قام بحذف المستخدم {user_id} عبر الأمر النصي")
-        await message.reply(f"✅ تم حذف المستخدم {user_id} بنجاح")
+        user = db.get_user_by_telegram_id(user_id)
+        if not user:
+            await message.reply("❌ المستخدم غير موجود")
+            return
+            
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [
+                InlineKeyboardButton(text="✅ نعم، احذف", callback_data=f"confirm:delete:{user_id}"),
+                InlineKeyboardButton(text="❌ إلغاء", callback_data="confirm:cancel")
+            ]
+        ])
+        await message.reply(f"⚠️ هل أنت متأكد من حذف المستخدم {user['full_name']} ({user_id}) نهائياً؟", reply_markup=keyboard)
     except Exception as e:
-        await message.reply("❌ حدث خطأ أثناء الحذف")
+        await message.reply("❌ حدث خطأ أثناء معالجة الطلب")
 
 @router.message(F.text.startswith("/ban_"))
 async def handle_text_ban(message: Message):
@@ -283,11 +291,20 @@ async def handle_text_ban(message: Message):
         
     try:
         user_id = int(message.text.split("_")[1])
-        db.set_user_active(user_id, 0)
-        db.add_admin_log(message.from_user.id, message.from_user.full_name, "حظر", "إدارة المستخدمين", f"قام بحظر المستخدم {user_id} عبر الأمر النصي")
-        await message.reply(f"🚫 تم حظر المستخدم {user_id} بنجاح")
+        user = db.get_user_by_telegram_id(user_id)
+        if not user:
+            await message.reply("❌ المستخدم غير موجود")
+            return
+            
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [
+                InlineKeyboardButton(text="🚫 نعم، احظر", callback_data=f"confirm:ban:{user_id}"),
+                InlineKeyboardButton(text="❌ إلغاء", callback_data="confirm:cancel")
+            ]
+        ])
+        await message.reply(f"⚠️ هل أنت متأكد من حظر المستخدم {user['full_name']} ({user_id})؟", reply_markup=keyboard)
     except Exception as e:
-        await message.reply("❌ حدث خطأ أثناء الحظر")
+        await message.reply("❌ حدث خطأ أثناء معالجة الطلب")
 
 @router.message(F.text.startswith("/unban_"))
 async def handle_text_unban(message: Message):
@@ -296,11 +313,48 @@ async def handle_text_unban(message: Message):
         
     try:
         user_id = int(message.text.split("_")[1])
-        db.set_user_active(user_id, 1)
-        db.add_admin_log(message.from_user.id, message.from_user.full_name, "فك حظر", "إدارة المستخدمين", f"قام بفك حظر المستخدم {user_id} عبر الأمر النصي")
-        await message.reply(f"✅ تم فك حظر المستخدم {user_id} بنجاح")
+        user = db.get_user_by_telegram_id(user_id)
+        if not user:
+            await message.reply("❌ المستخدم غير موجود")
+            return
+            
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [
+                InlineKeyboardButton(text="✅ نعم، فك الحظر", callback_data=f"confirm:unban:{user_id}"),
+                InlineKeyboardButton(text="❌ إلغاء", callback_data="confirm:cancel")
+            ]
+        ])
+        await message.reply(f"⚠️ هل أنت متأكد من فك حظر المستخدم {user['full_name']} ({user_id})؟", reply_markup=keyboard)
     except Exception as e:
-        await message.reply("❌ حدث خطأ أثناء فك الحظر")
+        await message.reply("❌ حدث خطأ أثناء معالجة الطلب")
+
+@router.callback_query(F.data.startswith("confirm:"))
+async def handle_confirmations(callback: CallbackQuery):
+    parts = callback.data.split(":")
+    action = parts[1]
+    
+    if action == "cancel":
+        await callback.message.edit_text("❌ تم إلغاء العملية.")
+        return
+        
+    user_id = int(parts[2])
+    user = db.get_user_by_telegram_id(user_id)
+    
+    if action == "delete":
+        db.cursor.execute("DELETE FROM users WHERE telegram_id = ?", (user_id,))
+        db.conn.commit()
+        db.add_admin_log(callback.from_user.id, callback.from_user.full_name, "حذف مستخدم", "إدارة المستخدمين", f"قام بحذف المستخدم {user_id} بعد التأكيد")
+        await callback.message.edit_text(f"✅ تم حذف المستخدم {user_id} بنجاح.")
+        
+    elif action == "ban":
+        db.set_user_active(user_id, 0)
+        db.add_admin_log(callback.from_user.id, callback.from_user.full_name, "حظر", "إدارة المستخدمين", f"قام بحظر المستخدم {user_id} بعد التأكيد")
+        await callback.message.edit_text(f"🚫 تم حظر المستخدم {user_id} بنجاح.")
+        
+    elif action == "unban":
+        db.set_user_active(user_id, 1)
+        db.add_admin_log(callback.from_user.id, callback.from_user.full_name, "فك حظر", "إدارة المستخدمين", f"قام بفك حظر المستخدم {user_id} بعد التأكيد")
+        await callback.message.edit_text(f"✅ تم فك حظر المستخدم {user_id} بنجاح.")
 
 @router.callback_query(F.data.startswith("button:add"))
 async def add_button_start_handler(callback: CallbackQuery, state: FSMContext):
