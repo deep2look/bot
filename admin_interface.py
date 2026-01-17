@@ -274,7 +274,11 @@ async def delete_button_handler_view(callback: CallbackQuery):
     btn_id = int(callback.data.split(":")[-1])
     btn = db.get_button_by_id(btn_id)
     parent_id = btn['parent_id'] if btn else None
-    db.delete_button(btn_id)
+    
+    if btn:
+        db.delete_button(btn_id)
+        db.add_admin_log(callback.from_user.id, callback.from_user.full_name, "حذف زر", "إدارة الأزرار", f"حذف الزر: {btn['text']}")
+    
     await callback.answer("✅ تم حذف الزر")
     
     # Refresh view by calling list_buttons_admin_view with a "mock" callback
