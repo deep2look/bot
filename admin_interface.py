@@ -866,11 +866,29 @@ async def delete_single_admin_log_handler(message: Message):
     
     try:
         parts = message.text.split("_")
-        msg_id = int(parts[-1])
-        db.delete_admin_log(msg_id)
-        await message.answer("✅ تم حذف السجل بنجاح.")
+        log_id = int(parts[-1])
+        log = db.cursor.execute("SELECT * FROM admin_logs WHERE id = ?", (log_id,)).fetchone()
+        
+        if not log:
+            await message.answer("❌ السجل غير موجود.")
+            return
+
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [
+                InlineKeyboardButton(text="✅ نعم، احذف", callback_data=f"confirm_del_log:{log_id}"),
+                InlineKeyboardButton(text="❌ إلغاء", callback_data="confirm:cancel")
+            ]
+        ])
+        await message.reply(f"⚠️ هل أنت متأكد من حذف هذا السجل؟\n📝 {log['action_type']} - {log['details']}", reply_markup=keyboard)
     except Exception:
         await message.answer("❌ أمر غير صالح.")
+
+@router.callback_query(F.data.startswith("confirm_del_log:"))
+async def confirm_del_log_callback(callback: CallbackQuery):
+    log_id = int(callback.data.split(":")[-1])
+    db.delete_admin_log(log_id)
+    await callback.message.edit_text(f"✅ تم حذف السجل رقم {log_id} بنجاح.")
+    await callback.answer()
 
 @router.message(F.text.startswith("/del_"))
 async def delete_single_log_command(message: Message):
@@ -884,13 +902,26 @@ async def delete_single_log_command(message: Message):
         parts = message.text.split("_")
         msg_id = int(parts[-1])
         msg = db.get_message_by_id(msg_id)
-        if msg:
-            db.delete_support_message(msg_id)
-            await message.answer("✅ تم حذف الرسالة بنجاح.")
-        else:
+        if not msg:
             await message.answer("❌ الرسالة غير موجودة.")
+            return
+
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [
+                InlineKeyboardButton(text="✅ نعم، احذف", callback_data=f"confirm_del_msg:{msg_id}"),
+                InlineKeyboardButton(text="❌ إلغاء", callback_data="confirm:cancel")
+            ]
+        ])
+        await message.reply(f"⚠️ هل أنت متأكد من حذف هذه الرسالة؟\n📝 {msg['message_text'][:50]}...", reply_markup=keyboard)
     except Exception:
         await message.answer("❌ أمر غير صالح.")
+
+@router.callback_query(F.data.startswith("confirm_del_msg:"))
+async def confirm_del_msg_callback(callback: CallbackQuery):
+    msg_id = int(callback.data.split(":")[-1])
+    db.delete_support_message(msg_id)
+    await callback.message.edit_text(f"✅ تم حذف الرسالة بنجاح.")
+    await callback.answer()
 
 # ======================
 # Broadcast Handlers
