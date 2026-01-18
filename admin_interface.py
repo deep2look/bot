@@ -752,7 +752,7 @@ async def view_section_logs(callback: CallbackQuery):
         
         logs_text += f"<b>{html.escape(sender)}:</b>\n{safe_msg}\n"
         logs_text += f"📅 <code>{msg['timestamp']}</code>\n"
-        logs_text += f"❌ /del\_{msg['id']}\n"
+        logs_text += f"❌ /del_{msg['id']}\n"
         logs_text += "────────────────\n"
     
     # Add clear all button
