@@ -123,6 +123,8 @@ async def list_buttons_admin_view(callback: CallbackQuery):
             InlineKeyboardButton(text="↑", callback_data=f"btn_move:up:{btn['id']}"),
             InlineKeyboardButton(text="↓", callback_data=f"btn_move:down:{btn['id']}"),
             InlineKeyboardButton(text="×", callback_data=f"btn_del:{btn['id']}"),
+        ])
+        keyboard.append([
             InlineKeyboardButton(text=btn['text'], callback_data=f"btn_edit:{btn['id']}")
         ])
     
@@ -163,6 +165,8 @@ async def move_button_handler(callback: CallbackQuery):
                 InlineKeyboardButton(text="↑", callback_data=f"btn_move:up:{btn_item['id']}"),
                 InlineKeyboardButton(text="↓", callback_data=f"btn_move:down:{btn_item['id']}"),
                 InlineKeyboardButton(text="×", callback_data=f"btn_del:{btn_item['id']}"),
+            ])
+            keyboard.append([
                 InlineKeyboardButton(text=btn_item['text'], callback_data=f"btn_edit:{btn_item['id']}")
             ])
         
