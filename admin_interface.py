@@ -615,7 +615,23 @@ async def edit_manager_perms(callback: CallbackQuery):
     )
 
 @router.callback_query(F.data.startswith("manager:delete:"))
-async def delete_manager_handler(callback: CallbackQuery):
+async def delete_manager_confirm(callback: CallbackQuery):
+    if not is_super_admin_user(callback.from_user.id):
+        await callback.answer("للأدمن الأساسي فقط", show_alert=True)
+        return
+    
+    target_id = int(callback.data.split(":")[-1])
+    user = db.get_user_by_telegram_id(target_id)
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="✅ نعم، احذفه", callback_data=f"manager:del_final:{target_id}"),
+            InlineKeyboardButton(text="❌ إلغاء", callback_data=f"manager:view:{target_id}")
+        ]
+    ])
+    await callback.message.edit_text(f"⚠️ هل أنت متأكد من حذف المشرف {user['telegram_id']} نهائياً؟", reply_markup=keyboard)
+
+@router.callback_query(F.data.startswith("manager:del_final:"))
+async def manager_del_final(callback: CallbackQuery):
     if not is_super_admin_user(callback.from_user.id):
         await callback.answer("للأدمن الأساسي فقط", show_alert=True)
         return
@@ -768,8 +784,6 @@ async def show_admin_logs(callback: CallbackQuery):
 
     logs_text = "🛡️ <b>سجل المشرفين (آخر 20 عملية):</b>\n\n"
     for log in logs:
-        # Use the name and username recorded in the log
-        # These are now guaranteed to be from the database at the time of logging
         admin_name = html.escape(log['admin_name'])
         username = log['username']
         
@@ -803,8 +817,10 @@ async def confirm_clear_logs(callback: CallbackQuery):
         return
         
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="✅ نعم، امسح الكل", callback_data="admin:clear_all_logs_final")],
-        [InlineKeyboardButton(text="❌ تراجع", callback_data="admin:admin_logs")]
+        [
+            InlineKeyboardButton(text="✅ نعم، امسح الكل", callback_data="admin:clear_all_logs_final"),
+            InlineKeyboardButton(text="❌ تراجع", callback_data="admin:admin_logs")
+        ]
     ])
     
     await callback.message.edit_text(
@@ -826,7 +842,18 @@ async def clear_all_logs_final(callback: CallbackQuery):
     await show_admin_logs(callback)
 
 @router.callback_query(F.data.startswith("logs:clear_all:"))
-async def clear_all_logs(callback: CallbackQuery):
+async def clear_all_logs_confirm(callback: CallbackQuery):
+    button_id = int(callback.data.split(":")[-1])
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="✅ نعم، امسح سجل المراسلات", callback_data=f"logs:clear_all_final:{button_id}"),
+            InlineKeyboardButton(text="❌ إلغاء", callback_data=f"logs:view:{button_id}")
+        ]
+    ])
+    await callback.message.edit_text("⚠️ هل أنت متأكد من مسح جميع الرسائل في هذا القسم؟", reply_markup=keyboard)
+
+@router.callback_query(F.data.startswith("logs:clear_all_final:"))
+async def clear_all_logs_final_exec(callback: CallbackQuery):
     button_id = int(callback.data.split(":")[-1])
     db.clear_support_messages_by_button(button_id)
     await callback.answer("✅ تم مسح جميع الرسائل بنجاح")
