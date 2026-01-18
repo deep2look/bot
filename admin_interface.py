@@ -119,8 +119,9 @@ async def list_buttons_admin_view(callback: CallbackQuery):
             keyboard.append([InlineKeyboardButton(text="⬅️ مستوى للأعلى", callback_data=f"admin:buttons_list:{back_id}" if back_id else "admin:buttons_list")])
 
     for btn in buttons:
+        btn_icon = "📞" if btn['type'] == 'contact' else "📂"
         keyboard.append([
-            InlineKeyboardButton(text=btn['text'], callback_data=f"btn_edit:{btn['id']}")
+            InlineKeyboardButton(text=f"{btn_icon} {btn['text']}", callback_data=f"btn_edit:{btn['id']}")
         ])
         keyboard.append([
             InlineKeyboardButton(text="🔼", callback_data=f"btn_move:up:{btn['id']}"),
@@ -161,8 +162,9 @@ async def move_button_handler(callback: CallbackQuery):
                 keyboard.append([InlineKeyboardButton(text="⬅️ مستوى للأعلى", callback_data=f"admin:buttons_list:{back_id}" if back_id else "admin:buttons_list")])
 
         for btn_item in buttons:
+            btn_icon = "📞" if btn_item['type'] == 'contact' else "📂"
             keyboard.append([
-                InlineKeyboardButton(text=btn_item['text'], callback_data=f"btn_edit:{btn_item['id']}")
+                InlineKeyboardButton(text=f"{btn_icon} {btn_item['text']}", callback_data=f"btn_edit:{btn_item['id']}")
             ])
             keyboard.append([
                 InlineKeyboardButton(text="🔼", callback_data=f"btn_move:up:{btn_item['id']}"),
