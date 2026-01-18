@@ -120,12 +120,12 @@ async def list_buttons_admin_view(callback: CallbackQuery):
 
     for btn in buttons:
         keyboard.append([
-            InlineKeyboardButton(text="↑", callback_data=f"btn_move:up:{btn['id']}"),
-            InlineKeyboardButton(text="↓", callback_data=f"btn_move:down:{btn['id']}"),
-            InlineKeyboardButton(text="×", callback_data=f"btn_del:{btn['id']}"),
+            InlineKeyboardButton(text=btn['text'], callback_data=f"btn_edit:{btn['id']}")
         ])
         keyboard.append([
-            InlineKeyboardButton(text=btn['text'], callback_data=f"btn_edit:{btn['id']}")
+            InlineKeyboardButton(text="🔼 رفـع", callback_data=f"btn_move:up:{btn['id']}"),
+            InlineKeyboardButton(text="🔽 خفـض", callback_data=f"btn_move:down:{btn['id']}"),
+            InlineKeyboardButton(text="❌ حـذف", callback_data=f"btn_del:{btn['id']}"),
         ])
     
     keyboard.append([InlineKeyboardButton(text="➕ إضافة زر هنا", callback_data=f"button:add:{parent_id}" if parent_id else "button:add")])
@@ -162,12 +162,12 @@ async def move_button_handler(callback: CallbackQuery):
 
         for btn_item in buttons:
             keyboard.append([
-                InlineKeyboardButton(text="↑", callback_data=f"btn_move:up:{btn_item['id']}"),
-                InlineKeyboardButton(text="↓", callback_data=f"btn_move:down:{btn_item['id']}"),
-                InlineKeyboardButton(text="×", callback_data=f"btn_del:{btn_item['id']}"),
+                InlineKeyboardButton(text=btn_item['text'], callback_data=f"btn_edit:{btn_item['id']}")
             ])
             keyboard.append([
-                InlineKeyboardButton(text=btn_item['text'], callback_data=f"btn_edit:{btn_item['id']}")
+                InlineKeyboardButton(text="🔼 رفـع", callback_data=f"btn_move:up:{btn_item['id']}"),
+                InlineKeyboardButton(text="🔽 خفـض", callback_data=f"btn_move:down:{btn_item['id']}"),
+                InlineKeyboardButton(text="❌ حـذف", callback_data=f"btn_del:{btn_item['id']}"),
             ])
         
         keyboard.append([InlineKeyboardButton(text="➕ إضافة زر هنا", callback_data=f"button:add:{parent_id}" if parent_id else "button:add")])
